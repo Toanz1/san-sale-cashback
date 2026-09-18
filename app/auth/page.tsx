@@ -1,18 +1,19 @@
 'use client';
-import { useState } from 'react';
+
+import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Sparkles, Mail, Lock, ArrowRight } from 'lucide-react';
 
 export default function AuthPage() {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [isLogin, setIsLogin] = useState<boolean>(true);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const handleAuth = async (e) => {
+  const handleAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage('');
@@ -36,8 +37,8 @@ export default function AuthPage() {
         alert('Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.');
         setIsLogin(true);
       }
-    } catch (err) {
-      setErrorMessage(err.message || 'Đã có lỗi xảy ra, vui lòng thử lại.');
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function AuthPage() {
                 type="email"
                 placeholder="example@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 required
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
               />
@@ -93,7 +94,7 @@ export default function AuthPage() {
                 type="password"
                 placeholder="Tối thiểu 6 ký tự"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 required
                 minLength={6}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition"
@@ -120,6 +121,7 @@ export default function AuthPage() {
           <p className="text-xs text-slate-500">
             {isLogin ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}
             <button
+              type="button"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setErrorMessage('');
