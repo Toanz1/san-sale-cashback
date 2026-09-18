@@ -1,20 +1,21 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/';
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const origin = requestUrl.origin;
 
   if (code) {
-    // Đổi code của Google thành phiên đăng nhập thực sự trên Supabase
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      // Đăng nhập thành công -> chuyển thẳng về trang chủ
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    
+    // Đổi authorization code lấy session
+    await supabase.auth.exchangeCodeForSession(code);
   }
 
-  // Nếu có lỗi, đưa về trang đăng nhập
-  return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
+  // Chuyển hướng về trang chủ sau khi xác thực
+  return NextResponse.redirect(`${origin}/`);
 }

@@ -22,18 +22,41 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    const initAuth = async () => {
+    const handleAuthInit = async () => {
+      // 1. Kiểm tra nếu URL trả về chứa hash token từ Google OAuth
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (!error && data?.session?.user) {
+            setUser(data.session.user);
+            await loadUserProfile(data.session.user);
+            // Xóa hash trên thanh địa chỉ để URL gọn gàng
+            window.history.replaceState(null, '', window.location.pathname);
+            return;
+          }
+        }
+      }
+
+      // 2. Nếu không có hash, đọc session bình thường
       const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        await loadUserProfile(currentUser);
+      if (session?.user) {
+        setUser(session.user);
+        await loadUserProfile(session.user);
       }
     };
 
-    initAuth();
+    handleAuthInit();
     fetchVouchers();
 
+    // 3. Lắng nghe thay đổi trạng thái đăng nhập
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -100,7 +123,23 @@ export default function Home() {
     setUser(null);
     setProfile(null);
   };
-
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      alert('Đăng nhập Google thất bại: ' + (err.message || 'Lỗi không xác định'));
+    }
+  };
   const handlePasteClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -143,7 +182,9 @@ export default function Home() {
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
-  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Tài khoản';
+  
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên';
+  const avatarChar = (displayName[0] || 'U').toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 selection:bg-rose-500 selection:text-white font-sans">
@@ -165,10 +206,10 @@ export default function Home() {
           <div>
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* Tên đăng nhập & Avatar */}
-                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg">
-                  <div className="w-6 h-6 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center text-xs font-bold shrink-0 uppercase">
-                    {displayName[0]}
+                {/* Thông tin tài khoản người dùng */}
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg shadow-inner">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    {avatarChar}
                   </div>
                   <span className="text-xs font-semibold text-slate-200 max-w-[100px] sm:max-w-[150px] truncate">
                     {displayName}
