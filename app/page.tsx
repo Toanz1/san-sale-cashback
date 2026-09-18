@@ -1,27 +1,44 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ExternalLink, Copy, Check, Sparkles, Tag, Flame, Wallet, UserCheck } from 'lucide-react';
 
+interface Coupon {
+  id: number;
+  platform: string;
+  code: string;
+  title: string;
+  description: string;
+  affiliate_url: string;
+}
+
+interface Product {
+  id: number;
+  title: string;
+  image_url: string;
+  sale_price: number;
+  cashback_rate: number;
+  product_url: string;
+}
+
 export default function HomePage() {
-  const [inputUrl, setInputUrl] = useState('');
-  const [convertedUrl, setConvertedUrl] = useState('');
-  const [user, setUser] = useState(null);
-  const [coupons, setCoupons] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [copiedCode, setCopiedCode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [inputUrl, setInputUrl] = useState<string>('');
+  const [convertedUrl, setConvertedUrl] = useState<string>('');
+  const [user, setUser] = useState<any>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [copiedCode, setCopiedCode] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    // 1. Kiểm tra trạng thái đăng nhập
     supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
 
-    // 2. Lấy dữ liệu Voucher và Deal bán chạy từ Supabase
-    supabase.from('coupons').select('*').then(({ data }) => setCoupons(data || []));
-    supabase.from('trending_products').select('*').then(({ data }) => setProducts(data || []));
+    supabase.from('coupons').select('*').then(({ data }) => setCoupons((data as Coupon[]) || []));
+    supabase.from('trending_products').select('*').then(({ data }) => setProducts((data as Product[]) || []));
   }, []);
 
-  const handleConvert = async (e) => {
+  const handleConvert = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inputUrl.trim()) return alert('Vui lòng dán link sản phẩm!');
     if (!user) return alert('Vui lòng đăng nhập để hệ thống ghi nhận hoàn tiền vào ví của bạn!');
@@ -39,14 +56,14 @@ export default function HomePage() {
       } else {
         alert(data.error || 'Có lỗi xảy ra khi tạo link hoàn tiền');
       }
-    } catch (err) {
+    } catch {
       alert('Lỗi kết nối máy chủ, vui lòng thử lại!');
     } finally {
       setLoading(false);
     }
   };
 
-  const copyText = (code) => {
+  const copyText = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(''), 2000);
@@ -54,7 +71,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* Thanh Điều Hướng Trên Cùng */}
+      {/* Header */}
       <header className="bg-orange-600 text-white shadow sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <a href="/" className="font-extrabold text-xl tracking-tight flex items-center gap-1.5">
@@ -80,7 +97,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Section: Dán Link Hoàn Tiền */}
+      {/* Hero Section */}
       <section className="bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 text-white py-12 px-4 shadow-inner">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-3xl sm:text-4xl font-black mb-3">Dán Link Shopee / Lazada Để Nhận Hoàn Tiền</h1>
@@ -93,7 +110,7 @@ export default function HomePage() {
               type="url"
               placeholder="Dán link sản phẩm (Shopee, Lazada)..."
               value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputUrl(e.target.value)}
               required
               className="flex-1 px-4 py-3.5 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-yellow-400 text-sm shadow"
             />
@@ -106,7 +123,6 @@ export default function HomePage() {
             </button>
           </form>
 
-          {/* Kết Quả Trả Về */}
           {convertedUrl && (
             <div className="mt-6 p-4 bg-white/10 rounded-xl backdrop-blur-md border border-white/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-left max-w-2xl mx-auto">
               <div className="overflow-hidden w-full">
@@ -126,7 +142,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Nội Dung: Voucher & Deal Hot */}
+      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-10 space-y-12">
         {/* Kho Mã Giảm Giá */}
         <section>
@@ -138,7 +154,7 @@ export default function HomePage() {
             {coupons.length === 0 ? (
               <p className="text-sm text-slate-500 col-span-3">Đang cập nhật danh sách mã giảm giá...</p>
             ) : (
-              coupons.map((c) => (
+              coupons.map((c: Coupon) => (
                 <div key={c.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
                   <span className="inline-block bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded mb-2">
                     {c.platform}
@@ -173,7 +189,7 @@ export default function HomePage() {
             {products.length === 0 ? (
               <p className="text-sm text-slate-500 col-span-4">Đang cập nhật danh sách sản phẩm hot...</p>
             ) : (
-              products.map((p) => (
+              products.map((p: Product) => (
                 <div key={p.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between hover:shadow transition">
                   <img src={p.image_url} alt={p.title} className="w-full h-44 object-cover" />
                   <div className="p-3.5">
