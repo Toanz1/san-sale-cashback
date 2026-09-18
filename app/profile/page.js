@@ -18,7 +18,7 @@ const BANK_OPTIONS = [
   'Ví ZaloPay'
 ];
 
-export default function WalletPage() {
+export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -93,8 +93,11 @@ export default function WalletPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFF9F6] flex items-center justify-center text-slate-500 font-sans">
-        Đang tải thông tin tài khoản...
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-slate-300 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>Đang tải thông tin tài khoản...</span>
+        </div>
       </div>
     );
   }
@@ -102,116 +105,127 @@ export default function WalletPage() {
   const username = user?.email?.split('@')[0] || 'toanzin00001';
   const balanceNumber = Number(profile?.balance);
   const safeBalance = isNaN(balanceNumber) ? 0 : balanceNumber;
+  const avatarChar = username.charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#FFF9F6] text-slate-800 font-sans">
-      {/* Thanh điều hướng trên cùng */}
-      <header className="bg-white border-b border-orange-100 sticky top-0 z-30">
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white pb-16">
+      {/* Top Navigation Bar đồng bộ với trang chủ */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-400 to-amber-400 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-rose-500/20 text-white">
                 S
               </div>
-              <span className="font-extrabold text-lg text-slate-800 tracking-tight">Thánh Săn Sale</span>
+              <div>
+                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                  SĂN SALE <span className="text-rose-500 font-black">HOÀN TIỀN</span>
+                </span>
+                <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Cashback Sàn TMĐT</p>
+              </div>
             </Link>
-            <span className="hidden md:inline-block text-xs font-semibold text-slate-500 hover:text-orange-600 transition cursor-pointer">
-              Mua sắm hoàn tiền
-            </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <button className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 text-sm hover:bg-orange-100 transition">
-              🔔
-            </button>
-            <div className="flex items-center gap-2 bg-orange-50/80 px-3 py-1.5 rounded-full border border-orange-100">
-              <div className="w-6 h-6 rounded-full bg-orange-400 text-white flex items-center justify-center text-xs font-bold uppercase">
-                {username.charAt(0)}
+            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {avatarChar}
               </div>
-              <span className="text-xs font-semibold text-slate-700 max-w-[120px] truncate">
-                {username}
+              <span className="text-xs font-semibold text-slate-200 max-w-[120px] sm:max-w-[180px] truncate">
+                {user?.email}
               </span>
             </div>
+
+            <button 
+              onClick={handleLogout} 
+              className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1"
+            >
+              Thoát
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Nội dung chính */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 pt-6">
+        {/* Navigation Buttons */}
         <div className="flex items-center gap-2 mb-6">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3.5 py-1.5 rounded-full hover:bg-slate-50 transition shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg border border-slate-700 transition"
           >
             ← Quay lại
           </button>
           <Link
             href="/"
-            className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-white border border-orange-200 px-3.5 py-1.5 rounded-full hover:bg-orange-50 transition shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-rose-400 hover:text-rose-300 px-3.5 py-1.5 rounded-lg border border-slate-700 transition"
           >
             🏠 Trang chủ
           </Link>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Cột trái: Thẻ người dùng và danh mục */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-orange-100 overflow-hidden text-center">
-              <div className="h-20 bg-gradient-to-r from-orange-400 to-rose-400"></div>
+          {/* Cột trái: Card thông tin và Menu */}
+          <aside className="lg:col-span-4 space-y-4">
+            {/* Thẻ người dùng & số dư */}
+            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl overflow-hidden shadow-xl text-center">
+              <div className="h-20 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500"></div>
               <div className="px-6 pb-6 pt-0 relative flex flex-col items-center">
-                <div className="w-16 h-16 -mt-8 rounded-full border-4 border-white bg-amber-400 text-white flex items-center justify-center text-2xl shadow">
-                  👤
+                <div className="w-16 h-16 -mt-8 rounded-full border-4 border-[#0F172A] bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center text-xl font-black shadow-lg">
+                  {avatarChar}
                 </div>
-                <h3 className="font-bold text-slate-800 text-sm mt-3">{username}</h3>
-                <p className="text-xs text-slate-400">{user?.email}</p>
+                <h3 className="font-bold text-white text-sm mt-3">{username}</h3>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{user?.email}</p>
 
-                <div className="w-full mt-4 p-4 rounded-xl bg-gradient-to-r from-orange-500 to-rose-400 text-white text-left flex items-center justify-between shadow-md shadow-orange-500/20">
+                {/* Hộp số dư neon */}
+                <div className="w-full mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white text-left flex items-center justify-between shadow-lg shadow-rose-600/20">
                   <div>
                     <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
                       Số dư khả dụng
                     </span>
-                    <span className="text-lg font-black tracking-tight">
+                    <span className="text-xl font-black tracking-tight">
                       {safeBalance.toLocaleString()} VNĐ
                     </span>
                   </div>
-                  <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-lg">
+                  <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
                     💳
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-orange-100 p-2 space-y-1">
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-orange-50 text-orange-600 font-bold text-xs text-left">
+            {/* Menu điều hướng */}
+            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-2 shadow-xl space-y-1">
+              <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-slate-700/60 text-rose-400 font-bold text-xs text-left border border-slate-600/50">
                 <span>👤</span> Thông tin tài khoản
               </button>
               <Link
                 href="/orders"
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 font-semibold text-xs text-left transition"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-700/40 text-slate-300 hover:text-white font-medium text-xs text-left transition"
               >
                 <span>🛍️</span> Đơn hàng
               </Link>
               <Link
-                href="/wallet"
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-600 font-semibold text-xs text-left transition"
+                href="/profile"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-700/40 text-slate-300 hover:text-white font-medium text-xs text-left transition"
               >
                 <span>📜</span> Lịch sử rút tiền
               </Link>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-red-50 text-red-500 font-semibold text-xs text-left transition border-t border-slate-100 mt-2"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-medium text-xs text-left transition border-t border-slate-700/50 mt-2"
               >
                 <span>🚪</span> Đăng xuất
               </button>
             </div>
-          </div>
+          </aside>
 
-          {/* Cột phải: Form cập nhật thông tin */}
-          <div className="lg:col-span-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-orange-100 p-6 sm:p-8">
+          {/* Cột phải: Form thông tin cá nhân Dark Mode */}
+          <section className="lg:col-span-8">
+            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-6 sm:p-8 shadow-xl">
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-slate-800">Thông tin cá nhân</h2>
-                <p className="text-xs font-semibold text-red-500 mt-1">
+                <h2 className="text-xl font-bold text-white">Thông tin cá nhân</h2>
+                <p className="text-xs text-rose-400 font-medium mt-1">
                   Điền thông tin đầy đủ và chính xác để nhận tiền
                 </p>
               </div>
@@ -219,7 +233,7 @@ export default function WalletPage() {
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
                       Họ và tên viết hoa không dấu
                     </label>
                     <input
@@ -227,11 +241,11 @@ export default function WalletPage() {
                       placeholder="NGUYEN VAN A"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value.toUpperCase())}
-                      className="w-full bg-[#F3F6FA] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-orange-500 transition"
+                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
                       Số điện thoại
                     </label>
                     <input
@@ -239,23 +253,23 @@ export default function WalletPage() {
                       placeholder="Nhập số điện thoại"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-[#F3F6FA] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-orange-500 transition"
+                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">
                     Chọn ngân hàng
                   </label>
                   <select
                     value={bankName}
                     onChange={(e) => setBankName(e.target.value)}
-                    className="w-full bg-[#F3F6FA] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-orange-500 transition"
+                    className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500 transition"
                   >
-                    <option value="">- - Chọn ngân hàng - -</option>
+                    <option value="" className="bg-slate-900 text-slate-400">- - Chọn ngân hàng - -</option>
                     {BANK_OPTIONS.map((item) => (
-                      <option key={item} value={item}>
+                      <option key={item} value={item} className="bg-slate-900 text-white">
                         {item}
                       </option>
                     ))}
@@ -264,7 +278,7 @@ export default function WalletPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
                       Số tài khoản ngân hàng
                     </label>
                     <input
@@ -272,24 +286,24 @@ export default function WalletPage() {
                       placeholder="Nhập số tài khoản"
                       value={bankAccount}
                       onChange={(e) => setBankAccount(e.target.value)}
-                      className="w-full bg-[#F3F6FA] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-orange-500 transition"
+                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">
                       Email
                     </label>
                     <input
                       type="text"
                       disabled
                       value={user?.email || ''}
-                      className="w-full bg-[#E9EEF5] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-500 cursor-not-allowed outline-none"
+                      className="w-full bg-slate-900/50 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-400 cursor-not-allowed outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">
                     Mật khẩu xác nhận (khi đổi thông tin)
                   </label>
                   <input
@@ -297,27 +311,29 @@ export default function WalletPage() {
                     placeholder="••••••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-[#F3F6FA] border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:border-orange-500 transition"
+                    className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
                   />
                   <span className="text-[11px] text-slate-400 mt-1 block">
                     Bắt buộc nếu bạn thay đổi họ tên, số điện thoại, số tài khoản hoặc ngân hàng.
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-orange-50/70 border border-orange-100 flex items-center gap-3">
-                  <span className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                {/* Notice Box Dark Mode */}
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3">
+                  <span className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
                     i
                   </span>
-                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                    Tài khoản có số dư trên <strong className="text-orange-600 font-bold">10K</strong> sẽ được tự động thanh toán vào ngày 17 và 27 hàng tháng.
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                    Tài khoản có số dư trên <strong className="text-rose-400 font-bold">10K</strong> sẽ được tự động thanh toán vào ngày 17 và 27 hàng tháng.
                   </p>
                 </div>
 
-                <div className="space-y-2 pt-2">
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-2">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-3 rounded-xl shadow-md shadow-orange-500/25 transition text-xs flex items-center justify-center gap-1.5"
+                    className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-rose-600/30 transition text-xs flex items-center justify-center gap-1.5"
                   >
                     {saving ? 'Đang lưu...' : 'Lưu thay đổi 💾'}
                   </button>
@@ -328,16 +344,16 @@ export default function WalletPage() {
                         alert('Yêu cầu đã được gửi tới quản trị viên.');
                       }
                     }}
-                    className="w-full bg-white border border-red-200 hover:bg-red-50 text-red-600 font-bold py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-1.5"
+                    className="w-full bg-slate-900 border border-red-500/30 hover:bg-red-500/10 text-red-400 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-1.5"
                   >
                     🗑️ Đóng tài khoản
                   </button>
                 </div>
               </form>
             </div>
-          </div>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
