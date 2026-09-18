@@ -9,8 +9,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [usersCount, setUsersCount] = useState(0);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [orders, setOrders] = useState([]);
+  const [vouchers, setVouchers] = useState([]);
   const [newVoucher, setNewVoucher] = useState({
     platform: 'Shopee',
     code: '',
@@ -68,7 +68,7 @@ export default function AdminDashboard() {
     setVouchers(voucherData || []);
   };
 
-  const handleAddVoucher = async (e: React.FormEvent) => {
+  const handleAddVoucher = async (e) => {
     e.preventDefault();
     if (!newVoucher.code || !newVoucher.title) return alert('Vui lòng điền đủ thông tin');
 
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteVoucher = async (id: string) => {
+  const handleDeleteVoucher = async (id) => {
     if (!confirm('Xóa mã này?')) return;
     await supabase.from('vouchers').delete().eq('id', id);
     fetchAdminStats();
@@ -101,7 +101,6 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans p-4 sm:p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header Admin */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-slate-800 gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -118,7 +117,6 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Các thẻ Thống Kê Nhanh */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
           <div className="bg-slate-800/80 border border-slate-700 p-5 rounded-xl">
             <p className="text-xs text-slate-400 font-medium uppercase">Tổng thành viên</p>
@@ -135,7 +133,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Cột trái: Quản lý Voucher */}
           <div className="lg:col-span-1 bg-slate-800/60 border border-slate-700 p-5 rounded-xl">
             <h2 className="text-base font-bold text-white mb-4">➕ Thêm Mã Giảm Giá Mới</h2>
             <form onSubmit={handleAddVoucher} className="flex flex-col gap-3">
@@ -194,7 +191,6 @@ export default function AdminDashboard() {
             </form>
           </div>
 
-          {/* Cột phải: Danh sách đơn hàng hoàn tiền gần nhất */}
           <div className="lg:col-span-2 bg-slate-800/60 border border-slate-700 p-5 rounded-xl">
             <h2 className="text-base font-bold text-white mb-4">📦 Đơn Hàng Hoàn Tiền Gần Đây</h2>
             {orders.length === 0 ? (
@@ -230,7 +226,6 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Danh sách các mã voucher đang hiển thị */}
             <h2 className="text-base font-bold text-white mt-8 mb-4">🏷️ Danh Sách Mã Đang Hiển Thị</h2>
             <div className="space-y-2">
               {vouchers.map((v) => (
