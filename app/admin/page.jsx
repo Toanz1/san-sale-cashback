@@ -17,9 +17,9 @@ export default function AdminPage() {
   const [expireTime, setExpireTime] = useState('Hôm nay');
   const [affiliateUrl, setAffiliateUrl] = useState('');
 
-  // Data State
-  const [vouchers, setVouchers] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  // Data State (Đã bỏ toàn bộ cú pháp TypeScript)
+  const [vouchers, setVouchers] = useState([]);
+  const [orders, setOrders] = useState([]);
 
   useEffect(() => {
     checkAdmin();
@@ -60,7 +60,7 @@ export default function AdminPage() {
     if (data) setOrders(data);
   };
 
-  const handleAddVoucher = async (e: React.FormEvent) => {
+  const handleAddVoucher = async (e) => {
     e.preventDefault();
     const { error } = await supabase.from('vouchers').insert({
       title,
@@ -82,13 +82,13 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteVoucher = async (id: string) => {
+  const handleDeleteVoucher = async (id) => {
     if (!confirm('Xác nhận xóa voucher này?')) return;
     await supabase.from('vouchers').delete().eq('id', id);
     fetchVouchers();
   };
 
-  const handleApproveOrder = async (order: any) => {
+  const handleApproveOrder = async (order) => {
     if (!confirm(`Duyệt hoàn tiền cho đơn ${order.order_id}?`)) return;
 
     await supabase.from('cashback_orders').update({ status: 'approved' }).eq('id', order.id);
@@ -224,7 +224,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Duyệt đơn hàng hoàn tiền */}
+        {/* Duyệt đơn hoàn tiền */}
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
           <h2 className="text-base font-bold text-white mb-4">Duyệt Đơn Hàng Hoàn Tiền</h2>
           {orders.length === 0 ? (
