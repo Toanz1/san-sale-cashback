@@ -63,8 +63,43 @@ export default function ProfilePage() {
   const handleSave = async (e) => {
     e.preventDefault();
     if (!user) return;
-    setSaving(true);
 
+    // Kiểm tra xem tài khoản đã từng lưu thông tin ngân hàng trước đó chưa
+    const hasExistingData = Boolean(
+      profile?.bank_account || profile?.bank_name || profile?.full_name
+    );
+
+    // Kiểm tra xem người dùng có thực sự thay đổi dữ liệu nào không
+    const isDataChanged =
+      fullName !== (profile?.full_name || '') ||
+      phone !== (profile?.phone || '') ||
+      bankName !== (profile?.bank_name || '') ||
+      bankAccount !== (profile?.bank_account || '');
+
+    // Nếu đã có thông tin và đang chỉnh sửa -> BẮT BUỘC xác nhận mật khẩu
+    if (hasExistingData && isDataChanged) {
+      if (!confirmPassword) {
+        alert('Vui lòng nhập "Mật khẩu xác nhận" để thay đổi thông tin nhận tiền!');
+        return;
+      }
+
+      setSaving(true);
+      // 1. Kiểm tra tính chính xác của mật khẩu bằng Supabase Auth
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: confirmPassword,
+      });
+
+      if (authError) {
+        setSaving(false);
+        alert('Mật khẩu xác nhận không chính xác! Vui lòng thử lại.');
+        return;
+      }
+    } else {
+      setSaving(true);
+    }
+
+    // 2. Mật khẩu đúng (hoặc lần đầu thiết lập) -> Tiến hành cập nhật Database
     try {
       const { error } = await supabase
         .from('profiles')
@@ -73,11 +108,23 @@ export default function ProfilePage() {
           phone: phone,
           bank_name: bankName,
           bank_account: bankAccount,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Cập nhật lại state profile hiện tại để ghi nhận mốc so sánh mới
+      setProfile((prev) => ({
+        ...prev,
+        full_name: fullName,
+        phone: phone,
+        bank_name: bankName,
+        bank_account: bankAccount,
+      }));
+
+      // Xóa trắng ô mật khẩu sau khi lưu thành công
+      setConfirmPassword('');
       alert('Đã lưu thông tin tài khoản thành công!');
     } catch (err) {
       alert('Lỗi: ' + (err.message || 'Không thể lưu dữ liệu'));
