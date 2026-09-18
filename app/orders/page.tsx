@@ -38,7 +38,7 @@ export default function OrdersPage() {
     fetchOrders();
   }, [router]);
 
-  // Tính toán số liệu cho 4 thẻ thống kê phía trên
+  // Tính toán số liệu cho 4 thẻ thống kê
   const totalOrders = orders.length;
   const processingOrders = orders.filter((o) => o.status === 'pending').length;
   const completedOrders = orders.filter((o) => o.status === 'approved').length;
@@ -55,6 +55,8 @@ export default function OrdersPage() {
     return matchCode && matchType;
   });
 
+  const username = user?.email?.split('@')[0] || 'toanzin00001';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-slate-300 font-sans">
@@ -68,18 +70,74 @@ export default function OrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white pb-20">
-      <main className="max-w-6xl mx-auto px-4 pt-8">
-        {/* 1. Thanh nút điều hướng trên cùng */}
-        <div className="flex items-center gap-3 mb-6">
+      
+      {/* 1. THANH HEADER TRÊN CÙNG ĐỒNG BỘ MÀU TỐI */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          
+          {/* Logo bên trái */}
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-500 via-orange-500 to-amber-400 p-[1.5px] flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center text-amber-400 font-bold text-sm">
+                🛍️
+              </div>
+            </div>
+            <span className="font-extrabold text-base tracking-tight text-white">
+              Thánh Săn Sale
+            </span>
+          </Link>
+
+          {/* Menu ở giữa */}
+          <div className="hidden sm:flex items-center">
+            <Link 
+              href="/" 
+              className="text-xs font-semibold text-slate-300 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-slate-800/60"
+            >
+              Mua sắm hoàn tiền
+            </Link>
+          </div>
+
+          {/* Khu vực bên phải: Chuông thông báo + Profile Pill */}
+          <div className="flex items-center gap-3">
+            {/* Chuông thông báo */}
+            <button 
+              title="Thông báo"
+              className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-700 transition"
+            >
+              🔔
+            </button>
+
+            {/* Tài khoản người dùng */}
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 pl-1 pr-3.5 py-1 rounded-full shadow-sm transition"
+            >
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-white text-[11px] font-black shadow-inner">
+                👤
+              </div>
+              <span className="text-xs font-semibold text-slate-200 tracking-tight">
+                {username}
+              </span>
+            </Link>
+          </div>
+
+        </div>
+      </header>
+
+      {/* 2. NỘI DUNG CHÍNH */}
+      <main className="max-w-6xl mx-auto px-4 pt-6">
+        
+        {/* Hàng nút điều hướng */}
+        <div className="flex items-center gap-2.5 mb-5">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-xl border border-slate-700 transition shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-xl border border-slate-700 transition shadow-sm"
           >
             ← Quay lại
           </button>
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-rose-400 hover:text-rose-300 px-4 py-2 rounded-xl border border-slate-700 transition shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-rose-400 hover:text-rose-300 px-3.5 py-1.5 rounded-xl border border-slate-700 transition shadow-sm"
           >
             🏠 Trang chủ
           </Link>
@@ -90,9 +148,8 @@ export default function OrdersPage() {
           Danh Sách Đơn Hàng
         </h1>
 
-        {/* 2. Hàng 4 Card Thống Kê */}
+        {/* 4 Card Thống Kê */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {/* Card 1: Tổng đơn hàng */}
           <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -107,7 +164,6 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* Card 2: Đang xử lý */}
           <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -122,7 +178,6 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* Card 3: Hoàn thành */}
           <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -137,7 +192,6 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* Card 4: Tổng hoàn tiền */}
           <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -153,9 +207,9 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* 3. Khung Thông Báo Cập Nhật Dữ Liệu */}
-        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-md">
-          <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-black shrink-0">
+        {/* Khung Thông Báo */}
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-md">
+          <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-900 flex items-center justify-center text-xs font-black shrink-0">
             i
           </div>
           <p className="text-xs text-slate-300 font-medium leading-relaxed">
@@ -163,7 +217,7 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        {/* 4. Thanh Tìm Kiếm & Bộ Lọc */}
+        {/* Thanh Tìm Kiếm & Bộ Lọc */}
         <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 mb-6 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             <div className="md:col-span-5">
@@ -203,7 +257,7 @@ export default function OrdersPage() {
             <div className="md:col-span-4 flex gap-2">
               <button
                 onClick={() => {}}
-                className="flex-1 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-xs shadow-lg shadow-rose-600/30 transition"
+                className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-lg shadow-orange-500/20 transition"
               >
                 Tìm kiếm
               </button>
@@ -220,7 +274,7 @@ export default function OrdersPage() {
           </div>
         </div>
 
-        {/* 5. Bảng Danh Sách Đơn Hàng */}
+        {/* Bảng Danh Sách Đơn Hàng */}
         <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -292,6 +346,7 @@ export default function OrdersPage() {
             </table>
           </div>
         </div>
+
       </main>
     </div>
   );
