@@ -8,6 +8,9 @@ import { supabase } from '@/lib/supabaseClient';
 export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [isPinUnlocked, setIsPinUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
   // Form State
   const [title, setTitle] = useState('');
@@ -17,18 +20,22 @@ export default function AdminPage() {
   const [expireTime, setExpireTime] = useState('Hôm nay');
   const [affiliateUrl, setAffiliateUrl] = useState('');
 
-  // Data State (Đã bỏ toàn bộ cú pháp TypeScript)
+  // Data State
   const [vouchers, setVouchers] = useState([]);
   const [orders, setOrders] = useState([]);
 
   useEffect(() => {
+    // Kiểm tra xem phiên làm việc hiện tại đã nhập mật khẩu chưa
+    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_unlocked') === 'true') {
+      setIsPinUnlocked(true);
+    }
     checkAdmin();
   }, []);
 
   const checkAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      alert('Vui lòng đăng nhập quyền quản trị!');
+      alert('Vui lòng đăng nhập tài khoản quản trị!');
       router.push('/login');
       return;
     }
@@ -40,7 +47,7 @@ export default function AdminPage() {
       .single();
 
     if (prof?.role !== 'admin') {
-      alert('Bạn không có quyền truy cập trang Admin!');
+      alert('Tài khoản này không có quyền truy cập trang Quản Trị!');
       router.push('/');
       return;
     }
@@ -48,6 +55,24 @@ export default function AdminPage() {
     fetchVouchers();
     fetchOrders();
     setLoading(false);
+  };
+
+  const handleVerifyPin = (e) => {
+    e.preventDefault();
+    const correctPin = process.env.NEXT_PUBLIC_ADMIN_SECRET_KEY || '123456';
+    if (pinInput === correctPin) {
+      setIsPinUnlocked(true);
+      sessionStorage.setItem('admin_unlocked', 'true');
+      setPinError('');
+    } else {
+      setPinError('Mật khẩu quản trị không chính xác!');
+    }
+  };
+
+  const handleLockAdmin = () => {
+    sessionStorage.removeItem('admin_unlocked');
+    setIsPinUnlocked(false);
+    setPinInput('');
   };
 
   const fetchVouchers = async () => {
@@ -104,19 +129,70 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F172A] text-slate-400 flex items-center justify-center text-sm">
-        Đang kiểm tra quyền Admin...
+        Đang xác thực thông tin tài khoản...
       </div>
     );
   }
 
+  // Giao diện Khóa Bảo Vệ - Yêu cầu nhập Mật Khẩu Quản Trị
+  if (!isPinUnlocked) {
+    return (
+      <div className="min-h-screen bg-[#0F172A] text-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl text-center">
+          <div className="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+            🔒
+          </div>
+          <h2 className="text-base font-bold text-white mb-1">Xác Thực Quản Trị Viên</h2>
+          <p className="text-xs text-slate-400 mb-5">Nhập mật khẩu cấp 2 để mở khóa bảng điều khiển</p>
+
+          <form onSubmit={handleVerifyPin} className="space-y-3">
+            <input
+              type="password"
+              placeholder="Nhập mật khẩu quản trị..."
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-center text-white tracking-widest outline-none focus:border-rose-500"
+              autoFocus
+            />
+            {pinError && <p className="text-[11px] text-red-400">{pinError}</p>}
+            <button
+              type="submit"
+              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-semibold py-2.5 rounded-xl text-xs transition shadow-lg shadow-rose-600/30"
+            >
+              Mở Khóa Quản Trị
+            </button>
+          </form>
+
+          <div className="mt-4 pt-4 border-t border-slate-800">
+            <Link href="/" className="text-xs text-slate-500 hover:text-slate-400 transition">
+              ← Quay về trang chủ
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Giao diện Quản trị khi đã nhập đúng mật khẩu
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 p-4 md:p-8 font-sans">
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <h1 className="text-lg font-bold text-rose-500">Trang Quản Trị Hệ Thống</h1>
-          <Link href="/" className="text-xs text-slate-400 hover:text-white transition">
-            ← Về Trang Chủ
-          </Link>
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-rose-500">Trang Quản Trị Hệ Thống</h1>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-semibold">Đã xác thực</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleLockAdmin}
+              className="text-xs text-slate-400 hover:text-rose-400 transition"
+            >
+              🔒 Khóa trang
+            </button>
+            <Link href="/" className="text-xs text-slate-400 hover:text-white transition">
+              ← Về Trang Chủ
+            </Link>
+          </div>
         </div>
 
         {/* Form Thêm Voucher */}
