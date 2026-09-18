@@ -7,74 +7,53 @@ export default function Home() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [inputUrl, setInputUrl] = useState('');
   const [affiliateLink, setAffiliateLink] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copiedVoucher, setCopiedVoucher] = useState(null);
 
-  // Danh sách voucher, đơn hoàn tiền, lịch sử rút
-  const [vouchers, setVouchers] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [withdraws, setWithdraws] = useState([]);
-
-  // Form rút tiền
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState('');
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  // Dữ liệu mã giảm giá mẫu
+  const sampleVouchers = [
+    { id: 1, platform: 'Shopee', code: 'SHOPEE50K', desc: 'Giảm 50K cho đơn từ 250K', tag: 'Toàn sàn', expires: 'Hôm nay' },
+    { id: 2, platform: 'Shopee', code: 'FREESHIPXTRA', desc: 'Miễn phí vận chuyển tới 70K', tag: 'Freeship', expires: '23:59' },
+    { id: 3, platform: 'Lazada', code: 'LAZ30K', desc: 'Giảm 30K đơn từ 150K', tag: 'Thu thập', expires: 'Sắp hết' },
+    { id: 4, platform: 'TikTok', code: 'TTSHOP20', desc: 'Giảm 15% cho đơn đầu tiên', tag: 'Khách mới', expires: 'Còn 2 ngày' },
+  ];
 
   useEffect(() => {
-    // 1. Tải danh sách voucher săn sale công khai
-    const fetchVouchers = async () => {
-      const { data } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
-      if (data) setVouchers(data);
-    };
-    fetchVouchers();
-
-    // 2. Kiểm tra thông tin đăng nhập của người dùng
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-      if (user) {
-        fetchUserData(user.id);
-      }
+      if (user) fetchProfile(user.id);
     };
     checkUser();
   }, []);
 
-  const fetchUserData = async (uid) => {
-    // Lấy thông tin ví
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (prof) setProfile(prof);
-
-    // Lấy danh sách đơn hoàn tiền
-    const { data: ords } = await supabase
-      .from('cashback_orders')
-      .select('*')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false });
-    if (ords) setOrders(ords);
-
-    // Lấy lịch sử yêu cầu rút tiền
-    const { data: wds } = await supabase
-      .from('withdraw_requests')
-      .select('*')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false });
-    if (wds) setWithdraws(wds);
+  const fetchProfile = async (uid) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (data) setProfile(data);
   };
 
-  const handleAuth = async (isSignUp) => {
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    if (!email || !password) return alert('Vui lòng nhập đủ email và mật khẩu');
+
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) alert(error.message);
-      else alert('Đăng ký thành công! Hãy kiểm tra hòm thư xác nhận.');
+      else {
+        alert('Đăng ký thành công! Vui lòng kiểm tra email để xác nhận kích hoạt.');
+        setShowAuthModal(false);
+      }
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) alert(error.message);
       else {
         setUser(data.user);
-        fetchUserData(data.user.id);
+        fetchProfile(data.user.id);
+        setShowAuthModal(false);
       }
     }
   };
@@ -83,13 +62,21 @@ export default function Home() {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    setOrders([]);
-    setWithdraws([]);
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setInputUrl(text);
+    } catch {
+      alert('Không thể đọc bộ nhớ tạm. Hãy dán bằng tay (Ctrl + V).');
+    }
   };
 
   const handleConvert = async () => {
-    if (!inputUrl) return alert('Vui lòng dán link sản phẩm!');
+    if (!inputUrl) return alert('Vui lòng dán link sản phẩm Shopee/Lazada!');
     setLoading(true);
+    setAffiliateLink('');
 
     try {
       const res = await fetch('/api/convert', {
@@ -101,308 +88,243 @@ export default function Home() {
         })
       });
       const data = await res.json();
-      setAffiliateLink(data.affiliateUrl);
-    } catch (e) {
-      alert('Có lỗi xảy ra khi tạo link!');
+      if (data.affiliateUrl) {
+        setAffiliateLink(data.affiliateUrl);
+      } else {
+        alert(data.error || 'Không thể tạo link hoàn tiền!');
+      }
+    } catch {
+      alert('Đã xảy ra lỗi khi tạo link!');
     }
     setLoading(false);
   };
 
-  const handleWithdrawRequest = async (e) => {
-    e.preventDefault();
-    const amount = Number(withdrawAmount);
-    const currentBalance = Number(profile?.balance || 0);
-
-    if (amount < 50000) return alert('Số tiền rút tối thiểu là 50.000đ!');
-    if (amount > currentBalance) return alert('Số dư hiện tại không đủ để rút!');
-    if (!bankName || !accountNumber || !accountHolder) return alert('Vui lòng nhập đầy đủ thông tin tài khoản!');
-
-    setIsWithdrawing(true);
-    try {
-      const { error } = await supabase.from('withdraw_requests').insert({
-        user_id: user.id,
-        amount: amount,
-        bank_name: bankName,
-        account_number: accountNumber,
-        account_holder: accountHolder,
-        status: 'pending'
-      });
-
-      if (error) throw error;
-
-      alert('Đã gửi yêu cầu rút tiền thành công!');
-      setWithdrawAmount('');
-      fetchUserData(user.id);
-    } catch (err) {
-      alert('Lỗi: ' + err.message);
-    }
-    setIsWithdrawing(false);
+  const handleCopyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedVoucher(code);
+    setTimeout(() => setCopiedVoucher(null), 2000);
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 flex flex-col items-center">
-      {/* Header */}
-      <div className="w-full max-w-3xl flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-red-600">Săn Sale Hoàn Tiền</h1>
-          <p className="text-[11px] text-slate-400">Mua sắm Shopee & Lazada có hoàn tiền</p>
-        </div>
-        {user ? (
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 selection:bg-rose-500 selection:text-white font-sans">
+      {/* Thanh điều hướng Header */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium">Số dư: <b className="text-green-600">{Number(profile?.balance || 0).toLocaleString()}đ</b></span>
-            <button onClick={handleLogout} className="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">Đăng xuất</button>
-          </div>
-        ) : (
-          <span className="text-xs text-slate-500">Khách vãng lai</span>
-        )}
-      </div>
-
-      {/* Đăng nhập / Đăng ký nếu chưa login */}
-      {!user && (
-        <div className="w-full max-w-3xl bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-          <h2 className="font-semibold mb-1 text-slate-800">Đăng nhập tài khoản</h2>
-          <p className="text-xs text-slate-500 mb-4">Đăng ký thành viên để lưu ví và nhận tiền hoàn tự động vào tài khoản.</p>
-          <div className="flex flex-col gap-3">
-            <input 
-              type="email" 
-              placeholder="Email của bạn" 
-              className="border p-2.5 rounded-lg text-sm outline-none focus:border-red-500"
-              value={email} onChange={(e) => setEmail(e.target.value)}
-            />
-            <input 
-              type="password" 
-              placeholder="Mật khẩu" 
-              className="border p-2.5 rounded-lg text-sm outline-none focus:border-red-500"
-              value={password} onChange={(e) => setPassword(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <button onClick={() => handleAuth(false)} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-medium transition">Đăng nhập</button>
-              <button onClick={() => handleAuth(true)} className="flex-1 bg-slate-800 hover:bg-slate-900 text-white py-2 rounded-lg text-sm font-medium transition">Đăng ký</button>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-rose-500/20 text-white">
+              S
+            </div>
+            <div>
+              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                SĂN SALE <span className="text-rose-500 font-black">HOÀN TIỀN</span>
+              </span>
+              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Cashback Sàn TMĐT</p>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Box Tạo Link Hoàn Tiền */}
-      <div className="w-full max-w-3xl bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-        <h2 className="text-lg font-bold mb-1">Dán Link Sản Phẩm Nhận Hoàn Tiền</h2>
-        <p className="text-xs text-slate-500 mb-4">Copy link bất kỳ từ Shopee hoặc Lazada rồi dán vào đây để nhận hoàn tiền.</p>
-        
-        <div className="flex flex-col gap-3">
-          <input 
-            type="text" 
-            placeholder="Dán link sản phẩm Shopee/Lazada vào đây..." 
-            className="w-full border p-3 rounded-lg text-sm outline-none focus:border-red-500"
-            value={inputUrl} onChange={(e) => setInputUrl(e.target.value)}
-          />
-          <button 
-            onClick={handleConvert}
-            disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-3 rounded-lg text-sm transition"
-          >
-            {loading ? 'Đang tạo link...' : 'Lấy Link Mua Có Hoàn Tiền'}
-          </button>
-        </div>
-
-        {affiliateLink && (
-          <div className="mt-5 p-4 bg-red-50 border border-red-200 rounded-lg text-center">
-            <p className="text-sm text-slate-700 mb-2 font-medium">Link hoàn tiền của bạn đã sẵn sàng:</p>
-            <a 
-              href={affiliateLink} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-block bg-red-600 text-white text-sm font-semibold px-6 py-2.5 rounded-lg shadow hover:bg-red-700"
-            >
-              Mở Sản Phẩm & Mua Hàng Ngay
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* Danh sách Voucher & Deal Hot */}
-      <div className="w-full max-w-3xl bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6">
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-slate-800">🔥 Mã Giảm Giá & Voucher Hot Nhất</h2>
-          <p className="text-xs text-slate-500">Thu thập mã giảm nhanh, mua sắm siêu tiết kiệm.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {vouchers.map((v) => (
-            <div key={v.id} className="border border-dashed border-red-300 bg-red-50/40 p-4 rounded-xl flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-red-100 text-red-600 rounded">
-                    {v.platform}
-                  </span>
-                  <span className="text-[11px] text-slate-500">{v.expires_at}</span>
+          <div>
+            {user ? (
+              <div className="flex items-center gap-3 bg-slate-800/80 border border-slate-700/60 rounded-full py-1.5 px-4 shadow-inner">
+                <div className="text-right">
+                  <p className="text-xs text-slate-400 font-normal">Số dư ví</p>
+                  <p className="text-sm font-bold text-emerald-400">{Number(profile?.balance || 0).toLocaleString()}đ</p>
                 </div>
-                <h3 className="font-semibold text-sm text-slate-800 mt-1">{v.title}</h3>
-                <p className="text-red-600 font-bold text-base mt-0.5">{v.discount}</p>
-                <p className="text-xs text-slate-500">{v.min_spend}</p>
+                <div className="h-6 w-px bg-slate-700"></div>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-rose-400 hover:text-rose-300 transition font-medium"
+                >
+                  Thoát
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setShowAuthModal(true); setIsSignUp(false); }}
+                className="text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-5 py-2 rounded-xl transition shadow-lg shadow-rose-600/30"
+              >
+                Đăng nhập
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section & Form chuyển link */}
+      <section className="relative overflow-hidden pt-12 pb-16 px-4">
+        {/* Vệt sáng trang trí background */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="max-w-3xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold uppercase tracking-wide mb-6">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            Hoàn tiền tự động tới 70% hoa hồng
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight mb-4">
+            Dán Link Sản Phẩm. <br />
+            <span className="bg-gradient-to-r from-rose-400 via-pink-400 to-amber-300 bg-clip-text text-transparent">
+              Nhận Lại Tiền Khi Mua Sắm.
+            </span>
+          </h1>
+          <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-8">
+            Áp dụng cho mọi sản phẩm trên Shopee, Lazada & TikTok Shop. Nhận lại tiền thật vào số dư tài khoản rút về ngân hàng.
+          </p>
+
+          {/* Hộp chuyển đổi link trung tâm */}
+          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl shadow-black/50 text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <div className="relative w-full flex items-center">
+                <input
+                  type="text"
+                  placeholder="Dán link sản phẩm Shopee, Lazada vào đây..."
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  className="w-full bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 rounded-xl pl-4 pr-16 py-3.5 outline-none focus:border-rose-500 transition"
+                />
+                <button
+                  onClick={handlePasteClipboard}
+                  className="absolute right-2 px-2.5 py-1 text-xs font-medium text-slate-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition"
+                >
+                  Dán nhanh
+                </button>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-red-100 flex items-center justify-between gap-2">
-                <span className="text-xs font-mono font-bold bg-white px-2.5 py-1 rounded border text-slate-700">
-                  {v.code || 'MÃ TỰ ĐỘNG'}
+              <button
+                onClick={handleConvert}
+                disabled={loading}
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-50 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-2"
+              >
+                {loading ? 'Đang xử lý...' : 'Lấy Link Hoàn Tiền'}
+              </button>
+            </div>
+
+            {/* Thông báo trả về link */}
+            {affiliateLink && (
+              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
+                <div>
+                  <p className="text-xs font-bold text-rose-400 uppercase tracking-wide">✓ Đã gắn mã hoàn tiền thành công!</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Bấm vào nút bên cạnh để mở ứng dụng/trang mua hàng và ghi nhận hoàn tiền.</p>
+                </div>
+                <a
+                  href={affiliateLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto text-center bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-lg shadow transition shrink-0"
+                >
+                  Đi Tới Mua Hàng ➔
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Danh mục Voucher hot */}
+      <section className="max-w-6xl mx-auto px-4 pb-20">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+              🔥 Mã Giảm Giá & Voucher Độc Quyền
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">Sao chép mã trước khi bấm lấy link hoàn tiền</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {sampleVouchers.map((v) => (
+            <div
+              key={v.id}
+              className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-200">
+                    {v.platform}
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-semibold">{v.tag}</span>
+                </div>
+                <p className="text-sm font-semibold text-white line-clamp-2">{v.desc}</p>
+                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expires}</p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between">
+                <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
+                  {v.code}
                 </span>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(v.code || v.affiliate_url);
-                    alert('Đã sao chép mã: ' + (v.code || 'Link deal!'));
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition"
+                  onClick={() => handleCopyCode(v.code)}
+                  className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition"
                 >
-                  Sao chép mã
+                  {copiedVoucher === v.code ? 'Đã chép!' : 'Sao chép'}
                 </button>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Khu vực thành viên đã đăng nhập */}
-      {user && (
-        <div className="w-full max-w-3xl flex flex-col gap-6 mb-10">
-          {/* Form Rút Tiền */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold mb-1 text-slate-800">Rút Tiền Về Ngân Hàng</h2>
-            <p className="text-xs text-slate-500 mb-4">Hạn mức rút tối thiểu 50.000đ. Tiền hoàn sẽ được duyệt và chuyển thẳng vào tài khoản của bạn.</p>
-            
-            <form onSubmit={handleWithdrawRequest} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Modal Đăng nhập / Đăng ký */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+
+            <h3 className="text-lg font-bold text-white text-center mb-1">
+              {isSignUp ? 'Tạo tài khoản mới' : 'Đăng nhập tài khoản'}
+            </h3>
+            <p className="text-xs text-slate-400 text-center mb-6">
+              Đăng nhập để theo dõi và rút tiền hoàn về ngân hàng
+            </p>
+
+            <form onSubmit={handleAuth} className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-600">Số tiền muốn rút (VNĐ)</label>
-                <input 
-                  type="number" 
-                  placeholder="Vd: 50000" 
+                <label className="text-xs text-slate-300 font-medium block mb-1">Email</label>
+                <input
+                  type="email"
                   required
-                  min="50000"
-                  className="w-full border p-2.5 rounded-lg text-sm mt-1 outline-none focus:border-red-500"
-                  value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-rose-500"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-600">Tên ngân hàng</label>
-                <input 
-                  type="text" 
-                  placeholder="Vd: MB Bank, Vietcombank..." 
+                <label className="text-xs text-slate-300 font-medium block mb-1">Mật khẩu</label>
+                <input
+                  type="password"
                   required
-                  className="w-full border p-2.5 rounded-lg text-sm mt-1 outline-none focus:border-red-500"
-                  value={bankName} onChange={(e) => setBankName(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-rose-500"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-slate-600">Số tài khoản</label>
-                <input 
-                  type="text" 
-                  placeholder="Vd: 0123456789" 
-                  required
-                  className="w-full border p-2.5 rounded-lg text-sm mt-1 outline-none focus:border-red-500"
-                  value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-600">Tên chủ tài khoản</label>
-                <input 
-                  type="text" 
-                  placeholder="Vd: NGUYEN VAN A" 
-                  required
-                  className="w-full border p-2.5 rounded-lg text-sm mt-1 outline-none uppercase focus:border-red-500"
-                  value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)}
-                />
-              </div>
-
-              <div className="md:col-span-2 mt-2">
-                <button 
-                  type="submit" 
-                  disabled={isWithdrawing}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg text-sm transition"
-                >
-                  {isWithdrawing ? 'Đang gửi yêu cầu...' : 'Gửi Yêu Cầu Rút Tiền'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full mt-4 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-rose-600/30"
+              >
+                {isSignUp ? 'Đăng ký ngay' : 'Đăng nhập'}
+              </button>
             </form>
-          </div>
 
-          {/* Lịch Sử Mua Hàng & Hoàn Tiền */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-bold mb-3 text-slate-800">Lịch Sử Mua Hàng & Hoàn Tiền</h2>
-            {orders.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">Bạn chưa có đơn hàng nào được ghi nhận hoàn tiền.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-600 border-b">
-                    <tr>
-                      <th className="py-2.5 px-3">Mã đơn</th>
-                      <th className="py-2.5 px-3">Tiền hoàn</th>
-                      <th className="py-2.5 px-3">Trạng thái</th>
-                      <th className="py-2.5 px-3">Ngày mua</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((ord) => (
-                      <tr key={ord.id} className="border-b hover:bg-slate-50">
-                        <td className="py-2.5 px-3 font-mono font-medium">{ord.order_id}</td>
-                        <td className="py-2.5 px-3 font-semibold text-green-600">+{Number(ord.cashback_amount).toLocaleString()}đ</td>
-                        <td className="py-2.5 px-3">
-                          {ord.status === 'approved' ? (
-                            <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">Đã duyệt ví</span>
-                          ) : ord.status === 'rejected' ? (
-                            <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">Đã hủy</span>
-                          ) : (
-                            <span className="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">Chờ đối soát</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-slate-400">{new Date(ord.created_at).toLocaleDateString('vi-VN')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Lịch Sử Yêu Cầu Rút Tiền */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-base font-bold mb-3 text-slate-800">Lịch Sử Yêu Cầu Rút Tiền</h2>
-            {withdraws.length === 0 ? (
-              <p className="text-sm text-slate-400 py-3 text-center">Chưa có yêu cầu rút tiền nào.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-600 border-b">
-                    <tr>
-                      <th className="py-2 px-3">Số tiền</th>
-                      <th className="py-2 px-3">Ngân hàng</th>
-                      <th className="py-2 px-3">Trạng thái</th>
-                      <th className="py-2 px-3">Thời gian</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {withdraws.map((w) => (
-                      <tr key={w.id} className="border-b">
-                        <td className="py-2 px-3 font-semibold text-slate-800">{Number(w.amount).toLocaleString()}đ</td>
-                        <td className="py-2 px-3 text-xs">{w.bank_name} - {w.account_number}</td>
-                        <td className="py-2 px-3">
-                          {w.status === 'completed' ? (
-                            <span className="text-xs text-green-600 font-medium">Đã thanh toán</span>
-                          ) : (
-                            <span className="text-xs text-amber-600 font-medium">Đang chờ duyệt</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-xs text-slate-400">{new Date(w.created_at).toLocaleDateString('vi-VN')}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-xs text-slate-400 hover:text-rose-400 transition"
+              >
+                {isSignUp ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
