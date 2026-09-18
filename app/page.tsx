@@ -1,20 +1,17 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function Home() {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [inputUrl, setInputUrl] = useState('');
   const [affiliateLink, setAffiliateLink] = useState('');
   const [loading, setLoading] = useState(false);
-  const [copiedVoucher, setCopiedVoucher] = useState(null);
+  const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
 
-  // Dữ liệu mã giảm giá mẫu
+  // Danh sách mã giảm giá mẫu
   const sampleVouchers = [
     { id: 1, platform: 'Shopee', code: 'SHOPEE50K', desc: 'Giảm 50K cho đơn từ 250K', tag: 'Toàn sàn', expires: 'Hôm nay' },
     { id: 2, platform: 'Shopee', code: 'FREESHIPXTRA', desc: 'Miễn phí vận chuyển tới 70K', tag: 'Freeship', expires: '23:59' },
@@ -31,31 +28,9 @@ export default function Home() {
     checkUser();
   }, []);
 
-  const fetchProfile = async (uid) => {
+  const fetchProfile = async (uid: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
     if (data) setProfile(data);
-  };
-
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    if (!email || !password) return alert('Vui lòng nhập đủ email và mật khẩu');
-
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) alert(error.message);
-      else {
-        alert('Đăng ký thành công! Vui lòng kiểm tra email để xác nhận kích hoạt.');
-        setShowAuthModal(false);
-      }
-    } else {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message);
-      else {
-        setUser(data.user);
-        fetchProfile(data.user.id);
-        setShowAuthModal(false);
-      }
-    }
   };
 
   const handleLogout = async () => {
@@ -99,7 +74,7 @@ export default function Home() {
     setLoading(false);
   };
 
-  const handleCopyCode = (code) => {
+  const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedVoucher(code);
     setTimeout(() => setCopiedVoucher(null), 2000);
@@ -138,12 +113,12 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => { setShowAuthModal(true); setIsSignUp(false); }}
-                className="text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-5 py-2 rounded-xl transition shadow-lg shadow-rose-600/30"
+              <Link
+                href="/login"
+                className="text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-5 py-2 rounded-xl transition shadow-lg shadow-rose-600/30 inline-block text-white"
               >
                 Đăng nhập
-              </button>
+              </Link>
             )}
           </div>
         </div>
@@ -262,69 +237,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* Modal Đăng nhập / Đăng ký */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-2xl p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white"
-            >
-              ✕
-            </button>
-
-            <h3 className="text-lg font-bold text-white text-center mb-1">
-              {isSignUp ? 'Tạo tài khoản mới' : 'Đăng nhập tài khoản'}
-            </h3>
-            <p className="text-xs text-slate-400 text-center mb-6">
-              Đăng nhập để theo dõi và rút tiền hoàn về ngân hàng
-            </p>
-
-            <form onSubmit={handleAuth} className="space-y-3">
-              <div>
-                <label className="text-xs text-slate-300 font-medium block mb-1">Email</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-300 font-medium block mb-1">Mật khẩu</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full mt-4 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-rose-600/30"
-              >
-                {isSignUp ? 'Đăng ký ngay' : 'Đăng nhập'}
-              </button>
-            </form>
-
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-xs text-slate-400 hover:text-rose-400 transition"
-              >
-                {isSignUp ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
