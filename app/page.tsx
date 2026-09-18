@@ -10,27 +10,95 @@ export default function Home() {
   const [affiliateLink, setAffiliateLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
+  const [vouchers, setVouchers] = useState<any[]>([]);
 
-  // Danh sách mã giảm giá mẫu
-  const sampleVouchers = [
-    { id: 1, platform: 'Shopee', code: 'SHOPEE50K', desc: 'Giảm 50K cho đơn từ 250K', tag: 'Toàn sàn', expires: 'Hôm nay' },
-    { id: 2, platform: 'Shopee', code: 'FREESHIPXTRA', desc: 'Miễn phí vận chuyển tới 70K', tag: 'Freeship', expires: '23:59' },
-    { id: 3, platform: 'Lazada', code: 'LAZ30K', desc: 'Giảm 30K đơn từ 150K', tag: 'Thu thập', expires: 'Sắp hết' },
-    { id: 4, platform: 'TikTok', code: 'TTSHOP20', desc: 'Giảm 15% cho đơn đầu tiên', tag: 'Khách mới', expires: 'Còn 2 ngày' },
+  // Thay email admin của bạn ở đây để đảm bảo luôn nhận diện quyền quản trị
+  const ADMIN_EMAIL = 'toanzin00001@gmail.com';
+
+  const defaultVouchers = [
+    { id: '1', platform: 'Shopee', code: 'SHOPEE50K', title: 'Giảm 50K cho đơn từ 250K', category: 'Toàn sàn', expire_time: 'Hôm nay' },
+    { id: '2', platform: 'Shopee', code: 'FREESHIPXTRA', title: 'Miễn phí vận chuyển tới 70K', category: 'Freeship', expire_time: '23:59' },
+    { id: '3', platform: 'Lazada', code: 'LAZ30K', title: 'Giảm 30K đơn từ 150K', category: 'Thu thập', expire_time: 'Sắp hết' },
+    { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày' },
   ];
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) fetchProfile(user.id);
+    // 1. Kiểm tra session hiện tại
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        await loadUserProfile(currentUser);
+      }
     };
-    checkUser();
+
+    initAuth();
+    fetchVouchers();
+
+    // 2. Lắng nghe sự kiện đăng nhập / đăng xuất tức thì
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        await loadUserProfile(currentUser);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const fetchProfile = async (uid: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (data) setProfile(data);
+  const loadUserProfile = async (currentUser: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Lỗi đọc profiles:', error);
+      }
+
+      if (data) {
+        // Nếu là email admin mà database chưa set thì bổ sung luôn
+        if (currentUser.email === ADMIN_EMAIL && data.role !== 'admin') {
+          data.role = 'admin';
+        }
+        setProfile(data);
+      } else {
+        // Trường hợp tài khoản chưa có dòng trong bảng profiles
+        const fallbackProfile = {
+          id: currentUser.id,
+          email: currentUser.email,
+          balance: 0,
+          role: currentUser.email === ADMIN_EMAIL ? 'admin' : 'user'
+        };
+        setProfile(fallbackProfile);
+
+        // Tự động chèn profile vào database
+        await supabase.from('profiles').upsert(fallbackProfile);
+      }
+    } catch (err) {
+      console.error('Lỗi khởi tạo profile:', err);
+    }
+  };
+
+  const fetchVouchers = async () => {
+    try {
+      const { data } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
+      if (data && data.length > 0) {
+        setVouchers(data);
+      } else {
+        setVouchers(defaultVouchers);
+      }
+    } catch {
+      setVouchers(defaultVouchers);
+    }
   };
 
   const handleLogout = async () => {
@@ -44,7 +112,7 @@ export default function Home() {
       const text = await navigator.clipboard.readText();
       setInputUrl(text);
     } catch {
-      alert('Không thể đọc bộ nhớ tạm. Hãy dán bằng tay (Ctrl + V).');
+      alert('Không thể đọc bộ nhớ tạm. Hãy dán bằng phím tắt (Ctrl + V).');
     }
   };
 
@@ -80,12 +148,15 @@ export default function Home() {
     setTimeout(() => setCopiedVoucher(null), 2000);
   };
 
+  // Xác định quyền admin: qua profile.role HOẶC qua email admin
+  const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
+
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 selection:bg-rose-500 selection:text-white font-sans">
-      {/* Thanh điều hướng Header */}
+      {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-rose-500/20 text-white">
               S
             </div>
@@ -95,19 +166,31 @@ export default function Home() {
               </span>
               <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Cashback Sàn TMĐT</p>
             </div>
-          </div>
+          </Link>
 
           <div>
             {user ? (
-              <div className="flex items-center gap-3 bg-slate-800/80 border border-slate-700/60 rounded-full py-1.5 px-4 shadow-inner">
-                <div className="text-right">
-                  <p className="text-xs text-slate-400 font-normal">Số dư ví</p>
-                  <p className="text-sm font-bold text-emerald-400">{Number(profile?.balance || 0).toLocaleString()}đ</p>
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Nút Admin - Xuất hiện khi là Admin */}
+                {isUserAdmin && (
+                  <Link
+                    href="/admin"
+                    className="text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-md shadow-rose-600/30 transition flex items-center gap-1.5"
+                  >
+                    <span>⚙</span> Quản trị
+                  </Link>
+                )}
+
+                <div className="text-xs bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                  <span className="text-slate-400 hidden sm:inline">Số dư:</span>
+                  <span className="text-emerald-400 font-bold">
+                    {Number(profile?.balance || 0).toLocaleString()}đ
+                  </span>
                 </div>
-                <div className="h-6 w-px bg-slate-700"></div>
-                <button
-                  onClick={handleLogout}
-                  className="text-xs text-rose-400 hover:text-rose-300 transition font-medium"
+
+                <button 
+                  onClick={handleLogout} 
+                  className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1"
                 >
                   Thoát
                 </button>
@@ -126,7 +209,6 @@ export default function Home() {
 
       {/* Hero Section & Form chuyển link */}
       <section className="relative overflow-hidden pt-12 pb-16 px-4">
-        {/* Vệt sáng trang trí background */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="max-w-3xl mx-auto text-center relative z-10">
@@ -145,7 +227,7 @@ export default function Home() {
             Áp dụng cho mọi sản phẩm trên Shopee, Lazada & TikTok Shop. Nhận lại tiền thật vào số dư tài khoản rút về ngân hàng.
           </p>
 
-          {/* Hộp chuyển đổi link trung tâm */}
+          {/* Hộp chuyển đổi link */}
           <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl shadow-black/50 text-left">
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="relative w-full flex items-center">
@@ -154,7 +236,7 @@ export default function Home() {
                   placeholder="Dán link sản phẩm Shopee, Lazada vào đây..."
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
-                  className="w-full bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 rounded-xl pl-4 pr-16 py-3.5 outline-none focus:border-rose-500 transition"
+                  className="w-full bg-slate-900/90 border border-slate-700 text-sm text-white placeholder-slate-500 rounded-xl pl-4 pr-20 py-3.5 outline-none focus:border-rose-500 transition"
                 />
                 <button
                   onClick={handlePasteClipboard}
@@ -175,7 +257,7 @@ export default function Home() {
 
             {/* Thông báo trả về link */}
             {affiliateLink && (
-              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
+              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-rose-400 uppercase tracking-wide">✓ Đã gắn mã hoàn tiền thành công!</p>
                   <p className="text-xs text-slate-300 mt-0.5">Bấm vào nút bên cạnh để mở ứng dụng/trang mua hàng và ghi nhận hoàn tiền.</p>
@@ -194,7 +276,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Danh mục Voucher hot */}
+      {/* Danh mục Voucher */}
       <section className="max-w-6xl mx-auto px-4 pb-20">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -206,7 +288,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {sampleVouchers.map((v) => (
+          {vouchers.map((v) => (
             <div
               key={v.id}
               className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition"
@@ -216,10 +298,10 @@ export default function Home() {
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-200">
                     {v.platform}
                   </span>
-                  <span className="text-[10px] text-amber-400 font-semibold">{v.tag}</span>
+                  <span className="text-[10px] text-amber-400 font-semibold">{v.category || 'Ưu đãi'}</span>
                 </div>
-                <p className="text-sm font-semibold text-white line-clamp-2">{v.desc}</p>
-                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expires}</p>
+                <p className="text-sm font-semibold text-white line-clamp-2">{v.title}</p>
+                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expire_time || 'Hôm nay'}</p>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between">
@@ -236,7 +318,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <Link href="/dashboard"></Link>
       </section>
     </div>
   );
