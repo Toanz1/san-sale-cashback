@@ -143,6 +143,7 @@ export default function Home() {
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Tài khoản';
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 selection:bg-rose-500 selection:text-white font-sans">
@@ -164,6 +165,17 @@ export default function Home() {
           <div>
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
+                {/* Tên đăng nhập & Avatar */}
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg">
+                  <div className="w-6 h-6 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center text-xs font-bold shrink-0 uppercase">
+                    {displayName[0]}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-200 max-w-[100px] sm:max-w-[150px] truncate">
+                    {displayName}
+                  </span>
+                </div>
+
+                {/* Nút Admin */}
                 {isUserAdmin && (
                   <Link
                     href="/admin"
@@ -173,6 +185,7 @@ export default function Home() {
                   </Link>
                 )}
 
+                {/* Số dư ví */}
                 <div className="text-xs bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
                   <span className="text-slate-400 hidden sm:inline">Số dư:</span>
                   <span className="text-emerald-400 font-bold">
