@@ -123,23 +123,7 @@ export default function Home() {
     setUser(null);
     setProfile(null);
   };
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      alert('Đăng nhập Google thất bại: ' + (err.message || 'Lỗi không xác định'));
-    }
-  };
+
   const handlePasteClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -206,15 +190,19 @@ export default function Home() {
           <div>
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* Thông tin tài khoản người dùng */}
-                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg shadow-inner">
+                {/* ĐÃ SỬA TẠI ĐÂY: Thẻ div đổi thành Link href="/profile" */}
+                <Link
+                  href="/profile"
+                  title="Đi đến Trang cá nhân"
+                  className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 hover:border-slate-500 px-2.5 py-1.5 rounded-lg shadow-inner transition cursor-pointer group"
+                >
                   <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
                     {avatarChar}
                   </div>
-                  <span className="text-xs font-semibold text-slate-200 max-w-[100px] sm:max-w-[150px] truncate">
+                  <span className="text-xs font-semibold text-slate-200 group-hover:text-white max-w-[100px] sm:max-w-[150px] truncate">
                     {displayName}
                   </span>
-                </div>
+                </Link>
 
                 {/* Nút Admin */}
                 {isUserAdmin && (
@@ -226,13 +214,16 @@ export default function Home() {
                   </Link>
                 )}
 
-                {/* Số dư ví */}
-                <div className="text-xs bg-slate-800/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+                {/* Số dư ví -> Click dẫn vào trang rút tiền/ví cá nhân */}
+                <Link
+                  href="/profile"
+                  className="text-xs bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition"
+                >
                   <span className="text-slate-400 hidden sm:inline">Số dư:</span>
                   <span className="text-emerald-400 font-bold">
                     {Number(profile?.balance || 0).toLocaleString()}đ
                   </span>
-                </div>
+                </Link>
 
                 <button 
                   onClick={handleLogout} 
