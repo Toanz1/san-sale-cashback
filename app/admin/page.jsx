@@ -24,7 +24,8 @@ export default function AdminPage() {
     code: '',
     description: '',
     tag: 'Toàn sàn',
-    expires: 'Hôm nay'
+    expires: 'Hôm nay',
+    targetUrl: ''
   });
 
   // Tìm kiếm người dùng
@@ -83,12 +84,36 @@ export default function AdminPage() {
     if (!newVoucher.code || !newVoucher.description) {
       return alert('Vui lòng nhập đầy đủ mã và mô tả voucher!');
     }
-    const { error } = await supabase.from('vouchers').insert([newVoucher]);
+
+    // Tự động gắn affiliate link MasOffer nếu có dán URL
+    const partnerCode = process.env.NEXT_PUBLIC_MASOFFER_ID || 'your_partner_code';
+    let affiliateLink = '';
+    if (newVoucher.targetUrl) {
+      const cleanUrl = newVoucher.targetUrl.split('?')[0];
+      affiliateLink = `https://go.masoffer.net/v0/${partnerCode}/?go=${encodeURIComponent(cleanUrl)}`;
+    }
+
+    const { error } = await supabase.from('vouchers').insert([{
+      platform: newVoucher.platform,
+      code: newVoucher.code,
+      description: newVoucher.description,
+      tag: newVoucher.tag,
+      expires: newVoucher.expires,
+      affiliate_url: affiliateLink || newVoucher.targetUrl
+    }]);
+
     if (error) {
-      alert('Lỗi thêm voucher: ' + error.message);
+      alert('Lỗi: ' + error.message);
     } else {
       alert('Đăng voucher thành công!');
-      setNewVoucher({ platform: 'Shopee', code: '', description: '', tag: 'Toàn sàn', expires: 'Hôm nay' });
+      setNewVoucher({
+        platform: 'Shopee',
+        code: '',
+        description: '',
+        tag: 'Toàn sàn',
+        expires: 'Hôm nay',
+        targetUrl: ''
+      });
       fetchAllData();
     }
   };
@@ -102,8 +127,7 @@ export default function AdminPage() {
   // ================= THAO TÁC DUYỆT RÚT TIỀN =================
   const handleApproveWithdrawal = async (withdraw) => {
     if (!confirm(`Xác nhận đã chuyển khoản ${Number(withdraw.amount).toLocaleString()}đ cho khách?`)) return;
-    
-    // Cập nhật trạng thái thành completed
+
     const { error } = await supabase
       .from('withdrawals')
       .update({ status: 'completed' })
@@ -120,10 +144,8 @@ export default function AdminPage() {
     const reason = prompt('Nhập lý do từ chối (Tiền sẽ được hoàn trả lại ví user):', 'Sai thông tin số tài khoản');
     if (reason === null) return;
 
-    // 1. Cập nhật trạng thái lệnh rút sang rejected
     await supabase.from('withdrawals').update({ status: 'rejected', note: reason }).eq('id', withdraw.id);
 
-    // 2. Hoàn lại số dư cho User
     const targetUser = users.find((u) => u.id === withdraw.user_id);
     const newBalance = Number(targetUser?.balance || 0) + Number(withdraw.amount);
 
@@ -157,11 +179,9 @@ export default function AdminPage() {
   const handleUpdateOrderStatus = async (order, newStatus) => {
     if (order.status === newStatus) return;
 
-    // Cập nhật trạng thái đơn
     const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', order.id);
     if (error) return alert('Lỗi: ' + error.message);
 
-    // Nếu duyệt Đơn Thành Công (approved) lần đầu -> Tự động cộng tiền hoàn vào ví
     if (newStatus === 'approved' && order.status !== 'approved' && order.user_id) {
       const targetUser = users.find((u) => u.id === order.user_id);
       const newBalance = Number(targetUser?.balance || 0) + Number(order.cashback_amount);
@@ -174,7 +194,6 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  // Thống kê nhanh
   const totalPendingWithdrawal = withdrawals
     .filter((w) => w.status === 'pending')
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -212,7 +231,7 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 pt-6">
-        {/* 4 Khối thống kê tổng quan */}
+        {/* Khối thống kê tổng quan */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -294,8 +313,6 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* NỘI DUNG THEO TỪNG TAB */}
-
         {/* TAB 1: TỔNG QUAN & VOUCHER */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -349,6 +366,17 @@ export default function AdminPage() {
                     value={newVoucher.tag}
                     onChange={(e) => setNewVoucher({ ...newVoucher, tag: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 mb-1">Link trang Voucher / Sản phẩm áp dụng</label>
+                  <input
+                    type="text"
+                    placeholder="Dán link Shopee/Lazada vào đây (https://...)"
+                    value={newVoucher.targetUrl}
+                    onChange={(e) => setNewVoucher({ ...newVoucher, targetUrl: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500 text-xs"
                   />
                 </div>
 
