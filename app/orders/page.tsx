@@ -1,256 +1,298 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
-interface Withdrawal {
-  id: string;
-  so_tien: number;
-  ngan_hang: string;
-  so_tai_khoan: string;
-  ten_chu_tai_khoan: string;
-  trang_thai: string;
-  created_at: string;
-}
-
-export default function WalletPage() {
+export default function OrdersPage() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [availableBalance, setAvailableBalance] = useState<number>(0);
-  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
 
-  // Form states
-  const [amount, setAmount] = useState<string>('');
-  const [bankName, setBankName] = useState<string>('MB Bank');
-  const [accountNumber, setAccountNumber] = useState<string>('');
-  const [accountName, setAccountName] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const MIN_WITHDRAW = 50000; // Hạn mức rút tối thiểu: 50.000đ
+  // States bộ lọc tìm kiếm
+  const [searchCode, setSearchCode] = useState('');
+  const [filterType, setFilterType] = useState('all');
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const fetchOrders = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+      setUser(user);
 
-  async function fetchData() {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-
-    if (user) {
-      // 1. Tính số dư khả dụng từ các đơn APPROVED
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('hoa_hong_tra_khach')
-        .eq('trang_thai', 'APPROVED');
-
-      // 2. Tính tổng tiền đã rút hoặc đang yêu cầu rút
-      const { data: withdrawData } = await supabase
-        .from('withdrawals')
+      // Lấy danh sách đơn hàng hoàn tiền từ bảng cashback_orders
+      const { data: ords } = await supabase
+        .from('cashback_orders')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      const totalEarned = (orders || []).reduce((sum, o) => sum + Number(o.hoa_hong_tra_khach || 0), 0);
-      const totalWithdrawn = (withdrawData || [])
-        .filter((w) => w.trang_thai !== 'REJECTED')
-        .reduce((sum, w) => sum + Number(w.so_tien || 0), 0);
+      if (ords) setOrders(ords);
+      setLoading(false);
+    };
 
-      // Số dư có thể rút = Tiền được duyệt - Tiền đã rút/đang chờ rút
-      setAvailableBalance(Math.max(0, totalEarned - totalWithdrawn));
-      setWithdrawals((withdrawData as Withdrawal[]) || []);
-    }
-    setLoading(false);
-  }
+    fetchOrders();
+  }, [router]);
 
-  async function handleWithdraw(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
+  // Tính toán số liệu cho 4 thẻ thống kê phía trên
+  const totalOrders = orders.length;
+  const processingOrders = orders.filter((o) => o.status === 'pending').length;
+  const completedOrders = orders.filter((o) => o.status === 'approved').length;
+  const totalCashback = orders
+    .filter((o) => o.status === 'approved')
+    .reduce((sum, o) => sum + Number(o.cashback_amount || 0), 0);
 
-    const withdrawAmount = Number(amount);
-
-    if (withdrawAmount < MIN_WITHDRAW) {
-      setMessage({ type: 'error', text: `Hạn mức rút tối thiểu là ${MIN_WITHDRAW.toLocaleString('vi-VN')} đ` });
-      return;
-    }
-
-    if (withdrawAmount > availableBalance) {
-      setMessage({ type: 'error', text: 'Số dư khả dụng không đủ để thực hiện yêu cầu!' });
-      return;
-    }
-
-    if (!accountNumber || !accountName) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ thông tin tài khoản nhận tiền!' });
-      return;
-    }
-
-    setSubmitting(true);
-
-    const { error } = await supabase.from('withdrawals').insert({
-      user_id: user.id,
-      so_tien: withdrawAmount,
-      ngan_hang: bankName,
-      so_tai_khoan: accountNumber.trim(),
-      ten_chu_tai_khoan: accountName.trim().toUpperCase(),
-      trang_thai: 'PENDING'
-    });
-
-    setSubmitting(false);
-
-    if (error) {
-      setMessage({ type: 'error', text: 'Lỗi khi gửi yêu cầu: ' + error.message });
-    } else {
-      setMessage({ type: 'success', text: 'Tạo yêu cầu rút tiền thành công! Hệ thống sẽ xử lý sớm nhất.' });
-      setAmount('');
-      setAccountNumber('');
-      setAccountName('');
-      fetchData(); // Cập nhật lại số dư
-    }
-  }
+  // Lọc danh sách theo từ khóa mã đơn và loại đơn
+  const filteredOrders = orders.filter((item) => {
+    const matchCode = searchCode
+      ? item.order_id?.toLowerCase().includes(searchCode.trim().toLowerCase())
+      : true;
+    const matchType = filterType === 'all' ? true : item.status === filterType;
+    return matchCode && matchType;
+  });
 
   if (loading) {
-    return <div className="p-8 text-center text-gray-500">Đang tải thông tin ví...</div>;
-  }
-
-  if (!user) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-red-500 mb-4">Vui lòng đăng nhập để thực hiện rút tiền.</p>
-        <a href="/auth" className="px-4 py-2 bg-blue-600 text-white rounded-lg inline-block">Đăng nhập</a>
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-slate-300 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>Đang tải danh sách đơn hàng...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-      {/* Thẻ số dư ví */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-2xl shadow-md">
-        <p className="text-sm font-light text-blue-100">Số dư có thể rút về tài khoản</p>
-        <p className="text-3xl font-extrabold mt-1">
-          {availableBalance.toLocaleString('vi-VN')} đ
-        </p>
-        <p className="text-xs text-blue-200 mt-2">
-          * Rút tối thiểu: {MIN_WITHDRAW.toLocaleString('vi-VN')} đ. Tiền về tài khoản trong 24h - 48h.
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white pb-20">
+      <main className="max-w-6xl mx-auto px-4 pt-8">
+        {/* 1. Thanh nút điều hướng trên cùng */}
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2 rounded-xl border border-slate-700 transition shadow-sm"
+          >
+            ← Quay lại
+          </button>
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-rose-400 hover:text-rose-300 px-4 py-2 rounded-xl border border-slate-700 transition shadow-sm"
+          >
+            🏠 Trang chủ
+          </Link>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Form yêu cầu rút tiền */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Tạo yêu cầu rút tiền</h2>
+        {/* Tiêu đề trang */}
+        <h1 className="text-2xl font-black text-white tracking-tight mb-6">
+          Danh Sách Đơn Hàng
+        </h1>
 
-          {message && (
-            <div className={`p-3 rounded-lg text-sm mb-4 ${
-              message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-            }`}>
-              {message.text}
-            </div>
-          )}
-
-          <form onSubmit={handleWithdraw} className="space-y-4">
+        {/* 2. Hàng 4 Card Thống Kê */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Card 1: Tổng đơn hàng */}
+          <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Số tiền muốn rút (VNĐ)</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="VD: 50000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                required
-              />
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Tổng đơn hàng
+              </span>
+              <span className="text-2xl font-black text-white mt-1 block">
+                {totalOrders}
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-lg">
+              👜
+            </div>
+          </div>
+
+          {/* Card 2: Đang xử lý */}
+          <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Đang xử lý
+              </span>
+              <span className="text-2xl font-black text-amber-400 mt-1 block">
+                {processingOrders}
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+              🔄
+            </div>
+          </div>
+
+          {/* Card 3: Hoàn thành */}
+          <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Hoàn thành
+              </span>
+              <span className="text-2xl font-black text-emerald-400 mt-1 block">
+                {completedOrders}
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg">
+              ✅
+            </div>
+          </div>
+
+          {/* Card 4: Tổng hoàn tiền */}
+          <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                Tổng hoàn tiền
+              </span>
+              <span className="text-2xl font-black text-rose-500 mt-1 block">
+                {totalCashback.toLocaleString()} VNĐ
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-lg">
+              💵
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Khung Thông Báo Cập Nhật Dữ Liệu */}
+        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-md">
+          <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-black shrink-0">
+            i
+          </div>
+          <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            Cập nhật dữ liệu sau khoảng 1 ngày. Ví dụ ngày 1/3/2026 đặt đơn thì khoảng trưa/chiều ngày 2/3/2026 sẽ hiển thị đơn ở đây.
+          </p>
+        </div>
+
+        {/* 4. Thanh Tìm Kiếm & Bộ Lọc */}
+        <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl p-5 mb-6 shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div className="md:col-span-5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Mã đơn hàng
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  placeholder="Lọc mã đơn..."
+                  value={searchCode}
+                  onChange={(e) => setSearchCode(e.target.value)}
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Ngân hàng thụ hưởng</label>
+            <div className="md:col-span-3">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Loại đơn
+              </label>
               <select
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500 transition"
               >
-                <option value="MB Bank">MB Bank (Quân Đội)</option>
-                <option value="Vietcombank">Vietcombank</option>
-                <option value="Techcombank">Techcombank</option>
-                <option value="VPBank">VPBank</option>
-                <option value="ACB">ACB</option>
-                <option value="Vietinbank">Vietinbank</option>
-                <option value="BIDV">BIDV</option>
-                <option value="TPBank">TPBank</option>
+                <option value="all">Tất cả loại đơn</option>
+                <option value="pending">Đang xử lý (Chờ duyệt)</option>
+                <option value="approved">Hoàn thành (Đã duyệt)</option>
+                <option value="rejected">Đã hủy đơn</option>
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Số tài khoản ngân hàng</label>
-              <input
-                type="text"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                placeholder="Nhập số tài khoản"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                required
-              />
+            <div className="md:col-span-4 flex gap-2">
+              <button
+                onClick={() => {}}
+                className="flex-1 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-xs shadow-lg shadow-rose-600/30 transition"
+              >
+                Tìm kiếm
+              </button>
+              <button
+                onClick={() => {
+                  setSearchCode('');
+                  setFilterType('all');
+                }}
+                className="bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold transition"
+              >
+                Tất cả đơn
+              </button>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Tên chủ tài khoản (viết hoa không dấu)</label>
-              <input
-                type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="VD: NGUYEN VAN A"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm uppercase"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting || availableBalance < MIN_WITHDRAW}
-              className={`w-full py-2.5 rounded-lg text-white font-semibold text-sm transition ${
-                submitting || availableBalance < MIN_WITHDRAW
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {submitting ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu rút tiền'}
-            </button>
-          </form>
+          </div>
         </div>
 
-        {/* Lịch sử yêu cầu rút tiền */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Lịch sử rút tiền</h2>
-
-          {withdrawals.length === 0 ? (
-            <p className="text-sm text-gray-400 my-auto text-center">Chưa có giao dịch rút tiền nào.</p>
-          ) : (
-            <div className="space-y-3 overflow-y-auto max-h-[350px]">
-              {withdrawals.map((w) => (
-                <div key={w.id} className="p-3 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {Number(w.so_tien).toLocaleString('vi-VN')} đ
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {w.ngan_hang} - {w.so_tai_khoan}
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      {new Date(w.created_at).toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                    w.trang_thai === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
-                    w.trang_thai === 'REJECTED' ? 'bg-rose-100 text-rose-700' :
-                    'bg-amber-100 text-amber-700'
-                  }`}>
-                    {w.trang_thai === 'COMPLETED' ? 'Thành công' :
-                     w.trang_thai === 'REJECTED' ? 'Từ chối' : 'Chờ chuyển'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* 5. Bảng Danh Sách Đơn Hàng */}
+        <div className="bg-slate-800/70 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-900/60 border-b border-slate-700 text-slate-400 uppercase tracking-wider text-[11px]">
+                  <th className="py-3.5 px-4 font-bold">STT</th>
+                  <th className="py-3.5 px-4 font-bold">LOẠI</th>
+                  <th className="py-3.5 px-4 font-bold">MÃ ĐƠN HÀNG</th>
+                  <th className="py-3.5 px-4 font-bold">TÊN SẢN PHẨM</th>
+                  <th className="py-3.5 px-4 font-bold">TIỀN HOÀN</th>
+                  <th className="py-3.5 px-4 font-bold">NGÀY MUA</th>
+                  <th className="py-3.5 px-4 font-bold text-center">TRẠNG THÁI</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/60">
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-16 text-slate-400">
+                      <div className="text-3xl mb-2">📋</div>
+                      <p className="font-semibold">Chưa có đơn hàng hợp lệ</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-700/20 transition">
+                      <td className="py-3.5 px-4 text-slate-400 font-medium">
+                        {index + 1}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold text-[10px] uppercase">
+                          {item.platform || 'TMĐT'}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-200">
+                        {item.order_id}
+                      </td>
+                      <td className="py-3.5 px-4 max-w-xs truncate text-slate-300">
+                        {item.product_name || 'Đơn hàng mua sắm hoàn tiền'}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-400 whitespace-nowrap text-sm">
+                        +{Number(item.cashback_amount || 0).toLocaleString()} đ
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-400 whitespace-nowrap">
+                        {new Date(item.created_at).toLocaleDateString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </td>
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        {item.status === 'approved' ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Hoàn thành
+                          </span>
+                        ) : item.status === 'rejected' ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            Đã hủy
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            Đang xử lý
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
