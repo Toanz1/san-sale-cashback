@@ -236,6 +236,7 @@ export default function Home() {
             </div>
           ))}
         </div>
+        <Link href="/dashboard"></Link>
       </section>
     </div>
   );
