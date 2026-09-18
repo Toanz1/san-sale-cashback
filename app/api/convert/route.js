@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Hàm tự động mở link rút gọn (s.shopee.vn, shp.ee) để lấy link đích thực sự
-async function resolveFinalUrl(url: string): Promise<string> {
+async function resolveFinalUrl(url) {
   try {
     const res = await fetch(url, {
       method: 'GET',
@@ -17,7 +17,7 @@ async function resolveFinalUrl(url: string): Promise<string> {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req) {
   try {
     const { originalUrl, userId } = await req.json();
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Vui lòng nhập link hợp lệ (bắt đầu bằng http)' }, { status: 400 });
     }
 
-    // 1. Tự động giải mã nếu là link rút gọn của Shopee
+    // 1. Tự động giải mã nếu là link rút gọn của Shopee / TikTok
     let finalUrl = originalUrl;
     if (originalUrl.includes('s.shopee.vn') || originalUrl.includes('shp.ee') || originalUrl.includes('vt.tiktok.com')) {
       finalUrl = await resolveFinalUrl(originalUrl);
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ affiliateUrl });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ error: error.message || 'Lỗi xử lý link' }, { status: 500 });
   }
 }
