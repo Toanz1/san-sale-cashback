@@ -3,29 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ExternalLink, Copy, Check, Sparkles, Tag, Flame, Wallet, UserCheck } from 'lucide-react';
 
-type Coupon = {
-  id: string | number;
-  platform: string;
-  title: string;
-  description: string;
-  code: string;
-};
-
-type Product = {
-  id: string | number;
-  image_url: string;
-  title: string;
-  sale_price: number | string;
-  cashback_rate: number | string;
-  product_url: string;
-};
-
 export default function HomePage() {
   const [inputUrl, setInputUrl] = useState('');
   const [convertedUrl, setConvertedUrl] = useState('');
   const [user, setUser] = useState(null);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [coupons, setCoupons] = useState([]);
+  const [products, setProducts] = useState([]);
   const [copiedCode, setCopiedCode] = useState('');
   const [loading, setLoading] = useState(false);
 
