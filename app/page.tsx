@@ -11,6 +11,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
+  const [hotProducts, setHotProducts] = useState<any[]>([]);
 
   const ADMIN_EMAIL = 'toanzin00001@gmail.com';
 
@@ -23,16 +24,7 @@ export default function Home() {
 
   const loadUserProfile = async (currentUser: any) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Lỗi đọc profiles:', error);
-      }
-
+      const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
       if (data) {
         if (currentUser.email === ADMIN_EMAIL && data.role !== 'admin') {
           data.role = 'admin';
@@ -50,18 +42,19 @@ export default function Home() {
         await supabase.from('profiles').upsert(fallbackProfile);
       }
     } catch (err) {
-      console.error('Lỗi khởi tạo profile:', err);
+      console.error('Lỗi profile:', err);
     }
   };
 
-  const fetchVouchers = async () => {
+  const fetchData = async () => {
     try {
-      const { data } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
-      if (data && data.length > 0) {
-        setVouchers(data);
-      } else {
-        setVouchers(defaultVouchers);
-      }
+      // 1. Voucher
+      const { data: vouData } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
+      setVouchers(vouData && vouData.length > 0 ? vouData : defaultVouchers);
+
+      // 2. Sản phẩm Hot
+      const { data: prodData } = await supabase.from('hot_products').select('*').order('created_at', { ascending: false });
+      setHotProducts(prodData || []);
     } catch {
       setVouchers(defaultVouchers);
     }
@@ -72,22 +65,17 @@ export default function Home() {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user || null;
       setUser(currentUser);
-      if (currentUser) {
-        await loadUserProfile(currentUser);
-      }
+      if (currentUser) await loadUserProfile(currentUser);
     };
 
     initAuth();
-    fetchVouchers();
+    fetchData();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      if (currentUser) {
-        await loadUserProfile(currentUser);
-      } else {
-        setProfile(null);
-      }
+      if (currentUser) await loadUserProfile(currentUser);
+      else setProfile(null);
     });
 
     return () => {
@@ -106,12 +94,12 @@ export default function Home() {
       const text = await navigator.clipboard.readText();
       setInputUrl(text);
     } catch {
-      alert('Không thể đọc bộ nhớ tạm. Hãy dán bằng phím tắt (Ctrl + V).');
+      alert('Không thể đọc bộ nhớ tạm. Hãy dùng phím tắt (Ctrl + V).');
     }
   };
 
   const handleConvert = async () => {
-    if (!inputUrl) return alert('Vui lòng dán link sản phẩm Shopee/Lazada!');
+    if (!inputUrl) return alert('Vui lòng dán link sản phẩm!');
     setLoading(true);
     setAffiliateLink('');
 
@@ -119,17 +107,11 @@ export default function Home() {
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          originalUrl: inputUrl,
-          userId: user ? user.id : 'guest'
-        })
+        body: JSON.stringify({ originalUrl: inputUrl, userId: user ? user.id : 'guest' })
       });
       const data = await res.json();
-      if (data.affiliateUrl) {
-        setAffiliateLink(data.affiliateUrl);
-      } else {
-        alert(data.error || 'Không thể tạo link hoàn tiền!');
-      }
+      if (data.affiliateUrl) setAffiliateLink(data.affiliateUrl);
+      else alert(data.error || 'Không thể tạo link hoàn tiền!');
     } catch {
       alert('Đã xảy ra lỗi khi tạo link!');
     }
@@ -142,9 +124,7 @@ export default function Home() {
     setTimeout(() => setCopiedVoucher(null), 2000);
 
     const link = voucher.affiliate_link || voucher.affiliate_url;
-    if (link) {
-      window.open(link, '_blank');
-    }
+    if (link) window.open(link, '_blank');
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
@@ -152,7 +132,7 @@ export default function Home() {
   const avatarChar = (displayName[0] || 'U').toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-100 selection:bg-rose-500 selection:text-white font-sans">
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans">
       {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -173,21 +153,18 @@ export default function Home() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link
                   href="/profile"
-                  title="Đi đến Trang cá nhân"
-                  className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 hover:border-slate-500 px-2.5 py-1.5 rounded-lg shadow-inner transition cursor-pointer group"
+                  className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg transition"
                 >
                   <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
                     {avatarChar}
                   </div>
-                  <span className="text-xs font-semibold text-slate-200 group-hover:text-white max-w-[100px] sm:max-w-[150px] truncate">
-                    {displayName}
-                  </span>
+                  <span className="text-xs font-semibold text-slate-200 max-w-[120px] truncate">{displayName}</span>
                 </Link>
 
                 {isUserAdmin && (
                   <Link
                     href="/admin"
-                    className="text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-md shadow-rose-600/30 transition flex items-center gap-1.5"
+                    className="text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-md transition flex items-center gap-1.5"
                   >
                     <span>⚙</span> Quản trị
                   </Link>
@@ -195,25 +172,20 @@ export default function Home() {
 
                 <Link
                   href="/profile"
-                  className="text-xs bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition"
+                  className="text-xs bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition"
                 >
                   <span className="text-slate-400 hidden sm:inline">Số dư:</span>
-                  <span className="text-emerald-400 font-bold">
-                    {Number(profile?.balance || 0).toLocaleString()}đ
-                  </span>
+                  <span className="text-emerald-400 font-bold">{Number(profile?.balance || 0).toLocaleString()}đ</span>
                 </Link>
 
-                <button 
-                  onClick={handleLogout} 
-                  className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1"
-                >
+                <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1">
                   Thoát
                 </button>
               </div>
             ) : (
               <Link
                 href="/login"
-                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-4 sm:px-5 py-2 rounded-xl transition shadow-lg shadow-rose-600/30 text-white"
+                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-4 sm:px-5 py-2 rounded-xl transition shadow-lg text-white"
               >
                 Đăng nhập
               </Link>
@@ -222,10 +194,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero Section & Form chuyển link */}
       <section className="relative overflow-hidden pt-12 pb-16 px-4">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-rose-600/15 rounded-full blur-3xl pointer-events-none"></div>
-
         <div className="max-w-3xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold uppercase tracking-wide mb-6">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
@@ -239,10 +209,10 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto mb-8">
-            Áp dụng cho mọi sản phẩm trên Shopee, Lazada & TikTok Shop. Nhận lại tiền thật vào số dư tài khoản rút về ngân hàng.
+            Áp dụng cho mọi sản phẩm trên Shopee, Lazada & TikTok Shop. Rút tiền về ngân hàng nhanh chóng.
           </p>
 
-          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl shadow-black/50 text-left">
+          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl text-left">
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="relative w-full flex items-center">
                 <input
@@ -265,17 +235,17 @@ export default function Home() {
                 onClick={handleConvert}
                 disabled={loading}
                 type="button"
-                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-50 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-2"
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition"
               >
                 {loading ? 'Đang xử lý...' : 'Lấy Link Hoàn Tiền'}
               </button>
             </div>
 
             {affiliateLink && (
-              <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-500/10 to-amber-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-rose-400 uppercase tracking-wide">✓ Đã gắn mã hoàn tiền thành công!</p>
-                  <p className="text-xs text-slate-300 mt-0.5">Bấm vào nút bên cạnh để mở ứng dụng/trang mua hàng và ghi nhận hoàn tiền.</p>
+                  <p className="text-xs text-slate-300 mt-0.5">Bấm vào nút để chuyển sang sàn và ghi nhận hoàn tiền.</p>
                 </div>
                 <a
                   href={affiliateLink}
@@ -291,14 +261,79 @@ export default function Home() {
         </div>
       </section>
 
+      {/* MỤC SẢN PHẨM BÁN CHẠY (HOT DEALS) */}
+      {hotProducts.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 pb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                🔥 Sản Phẩm Bán Chạy Hoàn Tiền Khủng
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">Bấm mua ngay để nhận hoa hồng hoàn tiền trực tiếp</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
+            {hotProducts.map((p) => (
+              <a
+                key={p.id}
+                href={p.affiliate_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-slate-800/60 border border-slate-700/60 hover:border-rose-500/60 rounded-xl overflow-hidden flex flex-col justify-between transition hover:-translate-y-1 shadow-lg"
+              >
+                <div>
+                  <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.image_url}
+                      alt={p.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                      {p.cashback_rate || 'Hoàn tiền'}
+                    </div>
+                    <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
+                      {p.platform || 'Shopee'}
+                    </div>
+                  </div>
+
+                  <div className="p-3">
+                    <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition">
+                      {p.title}
+                    </p>
+                    <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-sm font-black text-rose-400">
+                        {Number(p.price).toLocaleString()}đ
+                      </span>
+                      {p.original_price > p.price && (
+                        <span className="text-[10px] text-slate-500 line-through">
+                          {Number(p.original_price).toLocaleString()}đ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 pt-0">
+                  <div className="w-full text-center bg-slate-700/70 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-bold text-[11px] py-1.5 rounded-lg transition">
+                    Mua Hoàn Tiền ➔
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Danh mục Voucher */}
       <section className="max-w-6xl mx-auto px-4 pb-20">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-              🔥 Mã Giảm Giá & Voucher Độc Quyền
+              🎟️ Mã Giảm Giá & Voucher Độc Quyền
             </h2>
-            <p className="text-xs text-slate-400 mt-1">Sao chép mã trước khi bấm lấy link hoàn tiền</p>
+            <p className="text-xs text-slate-400 mt-1">Sao chép mã trước khi bấm lấy link mua sắm</p>
           </div>
         </div>
 
