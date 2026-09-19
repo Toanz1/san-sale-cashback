@@ -99,33 +99,32 @@ export default function Home() {
   };
 
   // Hàm chuyển đổi link gọi sang Backend Render
+  // Hàm chuyển đổi link gọi thẳng vào API nội bộ Next.js
   const handleConvert = async () => {
     if (!inputUrl.trim()) {
-      alert('Vui lòng nhập link sản phẩm Shopee!');
+      alert('Vui lòng nhập link sản phẩm Shopee, Lazada hoặc TikTok!');
       return;
     }
 
     setLoading(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_SHOPEE_CONVERTER_URL || 'https://shopee-converter-backend.onrender.com';
-
-      const response = await fetch(`${backendUrl}/convert`, {
+      const response = await fetch('/api/convert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           url: inputUrl.trim(),
-          subId: user?.id || 'guest',
+          userId: user?.id || 'guest',
         }),
       });
 
       const data = await response.json();
 
-      if (data && (data.affiliateUrl || data.shortLink || data.url)) {
-        setAffiliateLink(data.affiliateUrl || data.shortLink || data.url);
+      if (response.ok && data.affiliateUrl) {
+        setAffiliateLink(data.affiliateUrl);
       } else {
-        alert(data?.message || data?.error || 'Không thể tạo link hoàn tiền cho sản phẩm này!');
+        alert(data?.error || data?.message || 'Không thể tạo link hoàn tiền cho sản phẩm này!');
       }
     } catch (error) {
       console.error('Lỗi khi convert link:', error);
