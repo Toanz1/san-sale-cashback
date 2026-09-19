@@ -331,7 +331,6 @@ export default function AdminPage() {
         </div>
 
         {/* ================= TAB 1: BẢNG RÚT TIỀN ================= */}
-        {activeTab === 'vouchers' && (
   <div className="space-y-6">
     {/* Form thêm Voucher */}
     <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
