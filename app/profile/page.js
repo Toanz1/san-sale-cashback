@@ -100,13 +100,14 @@ export default function AccountPage() {
 
     setLoadingAction(true);
 
-    // Tạo lệnh rút tiền (gửi đồng thời account_number và bank_account)
+    // Gửi đồng bộ toàn bộ các tên cột có thể có trong bảng withdrawals
     const { error: withdrawErr } = await supabase.from('withdrawals').insert({
       user_id: user.id,
       amount: amount,
       bank_name: bankName,
       bank_account: bankAccount,
       account_number: bankAccount,
+      account_name: fullName,
       account_holder: fullName,
       status: 'pending'
     });
@@ -259,7 +260,7 @@ export default function AccountPage() {
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="VO THANH TOAN"
-                        className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
+                        className="w-full bg-slate-850 bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
                       />
                     </div>
                     <div>
