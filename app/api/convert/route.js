@@ -1,59 +1,64 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Thay chuỗi số bên dưới bằng Affiliate ID (Publisher ID) của bạn trên Shopee
-const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
+// Điền Affiliate ID của bạn hoặc cấu hình trong Vercel Environment Variables
+const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '1738491029';
 
-// Hàm mở link rút gọn (vn.shp.ee, shp.ee, s.shopee.vn, vt.tiktok.com) để lấy URL gốc
-async function resolveRedirectUrl(url) {
+// Hàm mở link rút gọn chống bị Shopee chặn trên server Vercel
+async function resolveShopeeUrl(shortUrl) {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(shortUrl, {
       method: 'GET',
-      redirect: 'follow',
+      redirect: 'manual', // Bắt trực tiếp header Location để tránh bị Shopee chặn redirect
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
       },
     });
-    return res.url || url;
-  } catch (e) {
-    return url;
+
+    const location = res.headers.get('location');
+    if (location) {
+      return location;
+    }
+    return shortUrl;
+  } catch (err) {
+    console.error('Không thể mở link rút gọn:', err);
+    return shortUrl;
   }
 }
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const rawUrl = body.originalUrl || body.url;
+    const rawUrl = body.originalUrl || body.url || '';
     const userId = body.userId || 'guest';
 
     if (!rawUrl || !rawUrl.trim().startsWith('http')) {
       return NextResponse.json(
-        { error: 'Vui lòng nhập link hợp lệ (bắt đầu bằng http hoặc https)' },
+        { error: 'Vui lòng nhập đường link hợp lệ (bắt đầu bằng http:// hoặc https://)' },
         { status: 400 }
       );
     }
 
     let cleanUrl = rawUrl.trim();
 
-    // 1. Tự động giải mã nếu là link rút gọn
+    // 1. Nhận diện và mở link nếu là link rút gọn của Shopee / TikTok
     if (
       cleanUrl.includes('shp.ee') ||
       cleanUrl.includes('s.shopee.vn') ||
-      cleanUrl.includes('shope.ee') ||
-      cleanUrl.includes('vt.tiktok.com')
+      cleanUrl.includes('shope.ee')
     ) {
-      cleanUrl = await resolveRedirectUrl(cleanUrl);
+      cleanUrl = await resolveShopeeUrl(cleanUrl);
     }
 
-    // Làm sạch sub_id (chỉ giữ chữ, số, gạch dưới)
+    // Làm sạch sub_id (chỉ cho phép ký tự an toàn)
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
 
     // 2. Nhận diện nền tảng
     let platform = 'Khác';
-    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shope.ee')) {
+    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee')) {
       platform = 'Shopee';
     } else if (cleanUrl.includes('lazada.vn')) {
       platform = 'Lazada';
@@ -64,25 +69,28 @@ export async function POST(req) {
     let affiliateUrl = '';
 
     // ============================================================
-    // 3. TẠO LINK TIẾP THỊ THEO NỀN TẢNG
+    // GHÉP LINK SHOPEE TRỰC TIẾP QUA AFFILIATE ID
     // ============================================================
     if (platform === 'Shopee') {
-      // Cắt bỏ các tham số rác đằng sau dấu ?
-      const productUrlNoQuery = cleanUrl.split('?')[0];
-      const encodedOrigin = encodeURIComponent(productUrlNoQuery);
+      // Cắt bỏ các tham số rác sau dấu ?
+      const baseProductUrl = cleanUrl.split('?')[0];
+      const encodedOrigin = encodeURIComponent(baseProductUrl);
 
-      // Ghép link qua cổng redirect an_redir chính thức của Shopee
+      // Cổng redirect tiếp thị liên kết chuẩn của Shopee
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
-    } else {
-      // Lazada / TikTok qua mạng tiếp thị liên kết (MasOffer/Accesstrade)
-      const urlBeforeParams = cleanUrl.split('?')[0];
-      const encodedUrl = encodeURIComponent(urlBeforeParams);
+    } 
+    // ============================================================
+    // LAZADA / TIKTOK
+    // ============================================================
+    else {
+      const baseProductUrl = cleanUrl.split('?')[0];
+      const encodedUrl = encodeURIComponent(baseProductUrl);
       const MO_PARTNER_CODE = process.env.NEXT_PUBLIC_MASOFFER_ID || 'masoffer_id';
       affiliateUrl = `https://go.masoffer.net/v0/${MO_PARTNER_CODE}/?go=${encodedUrl}&traffic_id=${cleanSubId}`;
     }
 
     // ============================================================
-    // 4. LƯU LỊCH SỬ VÀO SUPABASE (NẾU ĐÃ ĐĂNG NHẬP)
+    // LƯU LỊCH SỬ VÀO SUPABASE (NẾU ĐÃ ĐĂNG NHẬP)
     // ============================================================
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -103,9 +111,9 @@ export async function POST(req) {
 
     return NextResponse.json({ affiliateUrl, platform });
   } catch (err) {
-    console.error('Lỗi Server Convert:', err);
+    console.error('Lỗi xử lý Convert:', err);
     return NextResponse.json(
-      { error: 'Hệ thống đang bận, vui lòng thử lại sau!' },
+      { error: 'Hệ thống chuyển đổi link tạm thời bận, vui lòng thử lại!' },
       { status: 500 }
     );
   }
