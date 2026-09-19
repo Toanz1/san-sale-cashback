@@ -1,136 +1,130 @@
 'use client';
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
-const BANK_OPTIONS = [
-  'MB Bank (Quân Đội)',
-  'Vietcombank',
-  'Techcombank',
-  'VPBank',
-  'ACB',
-  'TPBank',
-  'BIDV',
-  'VietinBank',
-  'Ví MoMo',
-  'Ví ZaloPay'
-];
-
-export default function ProfilePage() {
+export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'orders' | 'withdrawals'
 
-  // Form states
+  // State form thông tin
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [bankName, setBankName] = useState('');
+  const [bankName, setBankName] = useState('MB Bank (Quân Đội)');
   const [bankAccount, setBankAccount] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // State rút tiền & lịch sử
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [loadingAction, setLoadingAction] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-      setUser(user);
+    initData();
+  }, []);
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+  const initData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setUser(user);
 
-      if (data) {
-        setProfile(data);
-        setFullName(data.full_name || '');
-        setPhone(data.phone || '');
-        setBankName(data.bank_name || '');
-        setBankAccount(data.bank_account || '');
-      }
-      setLoading(false);
-    };
+    // Lấy thông tin profile
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (prof) {
+      setProfile(prof);
+      setFullName(prof.full_name || '');
+      setPhone(prof.phone || '');
+      setBankName(prof.bank_name || 'MB Bank (Quân Đội)');
+      setBankAccount(prof.bank_account || '');
+    }
 
-    loadData();
-  }, [router]);
+    // Lấy lịch sử rút tiền
+    fetchWithdrawals(user.id);
+    // Lấy danh sách đơn hàng
+    fetchOrders(user.id);
+  };
 
-  const handleSave = async (e) => {
+  const fetchWithdrawals = async (uid) => {
+    const { data } = await supabase.from('withdrawals').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+    if (data) setWithdrawals(data);
+  };
+
+  const fetchOrders = async (uid) => {
+    const { data } = await supabase.from('cashback_orders').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+    if (data) setOrders(data);
+  };
+
+  // Cập nhật thông tin ngân hàng
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    setLoadingAction(true);
+    const { error } = await supabase.from('profiles').update({
+      full_name: fullName,
+      phone: phone,
+      bank_name: bankName,
+      bank_account: bankAccount
+    }).eq('id', user.id);
 
-    // Kiểm tra xem tài khoản đã từng lưu thông tin ngân hàng trước đó chưa
-    const hasExistingData = Boolean(
-      profile?.bank_account || profile?.bank_name || profile?.full_name
-    );
+    setLoadingAction(false);
+    if (error) alert('Lỗi cập nhật: ' + error.message);
+    else alert('Lưu thông tin thành công!');
+  };
 
-    // Kiểm tra xem người dùng có thực sự thay đổi dữ liệu nào không
-    const isDataChanged =
-      fullName !== (profile?.full_name || '') ||
-      phone !== (profile?.phone || '') ||
-      bankName !== (profile?.bank_name || '') ||
-      bankAccount !== (profile?.bank_account || '');
+  // Gửi lệnh rút tiền
+  const handleRequestWithdraw = async (e) => {
+    e.preventDefault();
+    const amount = Number(withdrawAmount);
+    const currentBalance = Number(profile?.balance || 0);
 
-    // Nếu đã có thông tin và đang chỉnh sửa -> BẮT BUỘC xác nhận mật khẩu
-    if (hasExistingData && isDataChanged) {
-      if (!confirmPassword) {
-        alert('Vui lòng nhập "Mật khẩu xác nhận" để thay đổi thông tin nhận tiền!');
-        return;
-      }
-
-      setSaving(true);
-      // 1. Kiểm tra tính chính xác của mật khẩu bằng Supabase Auth
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: confirmPassword,
-      });
-
-      if (authError) {
-        setSaving(false);
-        alert('Mật khẩu xác nhận không chính xác! Vui lòng thử lại.');
-        return;
-      }
-    } else {
-      setSaving(true);
+    if (!bankAccount || !fullName) {
+      alert('Vui lòng cập nhật đầy đủ Số tài khoản và Họ tên ở tab Thông tin tài khoản trước!');
+      setActiveTab('profile');
+      return;
     }
 
-    // 2. Mật khẩu đúng (hoặc lần đầu thiết lập) -> Tiến hành cập nhật Database
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName,
-          phone: phone,
-          bank_name: bankName,
-          bank_account: bankAccount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      // Cập nhật lại state profile hiện tại để ghi nhận mốc so sánh mới
-      setProfile((prev) => ({
-        ...prev,
-        full_name: fullName,
-        phone: phone,
-        bank_name: bankName,
-        bank_account: bankAccount,
-      }));
-
-      // Xóa trắng ô mật khẩu sau khi lưu thành công
-      setConfirmPassword('');
-      alert('Đã lưu thông tin tài khoản thành công!');
-    } catch (err) {
-      alert('Lỗi: ' + (err.message || 'Không thể lưu dữ liệu'));
-    } finally {
-      setSaving(false);
+    if (amount < 10000) {
+      alert('Số tiền rút tối thiểu là 10.000đ!');
+      return;
     }
+
+    if (amount > currentBalance) {
+      alert('Số dư khả dụng không đủ!');
+      return;
+    }
+
+    setLoadingAction(true);
+
+    // 1. Tạo lệnh rút tiền
+    const { error: withdrawErr } = await supabase.from('withdrawals').insert({
+      user_id: user.id,
+      amount: amount,
+      bank_name: bankName,
+      bank_account: bankAccount,
+      account_holder: fullName,
+      status: 'pending'
+    });
+
+    if (withdrawErr) {
+      alert('Lỗi tạo lệnh rút tiền: ' + withdrawErr.message);
+      setLoadingAction(false);
+      return;
+    }
+
+    // 2. Trừ trực tiếp số dư tạm tính
+    const newBalance = currentBalance - amount;
+    await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
+
+    setProfile(prev => ({ ...prev, balance: newBalance }));
+    setWithdrawAmount('');
+    setLoadingAction(false);
+    alert('Đã gửi yêu cầu rút tiền thành công! Vui lòng chờ đối soát thanh toán.');
+    fetchWithdrawals(user.id);
   };
 
   const handleLogout = async () => {
@@ -138,55 +132,31 @@ export default function ProfilePage() {
     router.push('/');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-slate-300 font-sans">
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
-          <span>Đang tải thông tin tài khoản...</span>
-        </div>
-      </div>
-    );
-  }
-
-  const username = user?.email?.split('@')[0] || 'toanzin00001';
-  const balanceNumber = Number(profile?.balance);
-  const safeBalance = isNaN(balanceNumber) ? 0 : balanceNumber;
-  const avatarChar = username.charAt(0).toUpperCase();
-
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white pb-16">
-      {/* Top Navigation Bar đồng bộ với trang chủ */}
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans">
+      {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-rose-500/20 text-white">
-                S
-              </div>
-              <div>
-                <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                  SĂN SALE <span className="text-rose-500 font-black">HOÀN TIỀN</span>
-                </span>
-                <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Cashback Sàn TMĐT</p>
-              </div>
-            </Link>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl text-white">
+              S
+            </div>
+            <div>
+              <span className="font-extrabold text-base tracking-tight text-white">
+                SĂN SALE <span className="text-rose-500">HOÀN TIỀN</span>
+              </span>
+              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">CASHBACK SÀN TMĐT</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                {avatarChar}
-              </div>
-              <span className="text-xs font-semibold text-slate-200 max-w-[120px] sm:max-w-[180px] truncate">
-                {user?.email}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs">
+              <span className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center font-bold text-[10px] text-white">
+                {user?.email?.charAt(0).toUpperCase()}
               </span>
+              <span className="text-slate-300 font-medium">{user?.email}</span>
             </div>
-
-            <button 
-              onClick={handleLogout} 
-              className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1"
-            >
+            <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-rose-400 transition">
               Thoát
             </button>
           </div>
@@ -194,213 +164,302 @@ export default function ProfilePage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 pt-6">
-        {/* Navigation Buttons */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1.5 text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3.5 py-1.5 rounded-lg border border-slate-700 transition"
-          >
+          <button onClick={() => router.back()} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
             ← Quay lại
           </button>
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xs font-medium bg-slate-800/80 hover:bg-slate-700 text-rose-400 hover:text-rose-300 px-3.5 py-1.5 rounded-lg border border-slate-700 transition"
-          >
+          <Link href="/" className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
             🏠 Trang chủ
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Cột trái: Card thông tin và Menu */}
-          <aside className="lg:col-span-4 space-y-4">
-            {/* Thẻ người dùng & số dư */}
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl overflow-hidden shadow-xl text-center">
-              <div className="h-20 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500"></div>
-              <div className="px-6 pb-6 pt-0 relative flex flex-col items-center">
-                <div className="w-16 h-16 -mt-8 rounded-full border-4 border-[#0F172A] bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center text-xl font-black shadow-lg">
-                  {avatarChar}
-                </div>
-                <h3 className="font-bold text-white text-sm mt-3">{username}</h3>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">{user?.email}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Cột trái */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Card số dư */}
+            <div className="rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 p-6 text-white shadow-xl shadow-rose-950/20 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-slate-900/90 border-2 border-white/20 flex items-center justify-center text-2xl font-black text-white mb-3">
+                {user?.email?.charAt(0).toUpperCase()}
+              </div>
+              <p className="font-bold text-sm">{user?.email?.split('@')[0]}</p>
+              <p className="text-xs text-rose-100/80 mb-6">{user?.email}</p>
 
-                {/* Hộp số dư neon */}
-                <div className="w-full mt-4 p-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white text-left flex items-center justify-between shadow-lg shadow-rose-600/20">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-90 block">
-                      Số dư khả dụng
-                    </span>
-                    <span className="text-xl font-black tracking-tight">
-                      {safeBalance.toLocaleString()} VNĐ
-                    </span>
-                  </div>
-                  <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-xl">
-                    💳
-                  </div>
+              <div className="bg-slate-900/90 border border-white/10 rounded-xl p-4 flex items-center justify-between text-left">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Số dư khả dụng</p>
+                  <p className="text-xl font-black text-rose-400 mt-0.5">
+                    {Number(profile?.balance || 0).toLocaleString()} VNĐ
+                  </p>
                 </div>
+                <div className="text-2xl">💳</div>
               </div>
             </div>
 
-            {/* Menu điều hướng */}
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-2 shadow-xl space-y-1">
-              <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-slate-700/60 text-rose-400 font-bold text-xs text-left border border-slate-600/50">
+            {/* Menu điều hướng Tab */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2 space-y-1">
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${
+                  activeTab === 'profile'
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <span>👤</span> Thông tin tài khoản
               </button>
-              <Link
-                href="/orders"
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-700/40 text-slate-300 hover:text-white font-medium text-xs text-left transition"
+
+              <button
+                onClick={() => setActiveTab('orders')}
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${
+                  activeTab === 'orders'
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
-                <span>🛍️</span> Đơn hàng
-              </Link>
-              <Link
-                href="/profile"
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-slate-700/40 text-slate-300 hover:text-white font-medium text-xs text-left transition"
+                <span>🛍️</span> Đơn hàng ({orders.length})
+              </button>
+
+              <button
+                onClick={() => setActiveTab('withdrawals')}
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${
+                  activeTab === 'withdrawals'
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
-                <span>📜</span> Lịch sử rút tiền
-              </Link>
+                <span>📜</span> Lịch sử rút tiền ({withdrawals.length})
+              </button>
+
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 font-medium text-xs text-left transition border-t border-slate-700/50 mt-2"
+                className="w-full text-left px-4 py-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-400 flex items-center gap-3 transition"
               >
                 <span>🚪</span> Đăng xuất
               </button>
             </div>
-          </aside>
+          </div>
 
-          {/* Cột phải: Form thông tin cá nhân Dark Mode */}
-          <section className="lg:col-span-8">
-            <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-6 sm:p-8 shadow-xl">
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-white">Thông tin cá nhân</h2>
-                <p className="text-xs text-rose-400 font-medium mt-1">
-                  Điền thông tin đầy đủ và chính xác để nhận tiền
-                </p>
-              </div>
+          {/* Cột phải: Nội dung theo Tab */}
+          <div className="lg:col-span-8 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8">
+            {/* TAB 1: THÔNG TIN TÀI KHOẢN */}
+            {activeTab === 'profile' && (
+              <div>
+                <h2 className="text-lg font-bold text-white mb-1">Thông tin cá nhân</h2>
+                <p className="text-xs text-slate-400 mb-6">Điền thông tin đầy đủ và chính xác để nhận tiền</p>
 
-              <form onSubmit={handleSave} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Họ và tên viết hoa không dấu
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="NGUYEN VAN A"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value.toUpperCase())}
-                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
-                    />
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1.5">Họ và tên viết hoa không dấu</label>
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="VO THANH TOAN"
+                        className="w-full bg-slate-850 bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1.5">Số điện thoại</label>
+                      <input
+                        type="text"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0812646494"
+                        className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
+                      />
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Số điện thoại
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nhập số điện thoại"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
-                    />
+                    <label className="text-xs text-slate-400 block mb-1.5">Chọn ngân hàng</label>
+                    <select
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
+                    >
+                      <option value="MB Bank (Quân Đội)">MB Bank (Quân Đội)</option>
+                      <option value="Vietcombank">Vietcombank</option>
+                      <option value="Techcombank">Techcombank</option>
+                      <option value="ACB">ACB</option>
+                      <option value="TPBank">TPBank</option>
+                      <option value="VPBank">VPBank</option>
+                      <option value="Agribank">Agribank</option>
+                      <option value="BIDV">BIDV</option>
+                      <option value="Vietinbank">Vietinbank</option>
+                      <option value="MoMo">Ví MoMo</option>
+                    </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">
-                    Chọn ngân hàng
-                  </label>
-                  <select
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500 transition"
-                  >
-                    <option value="" className="bg-slate-900 text-slate-400">- - Chọn ngân hàng - -</option>
-                    {BANK_OPTIONS.map((item) => (
-                      <option key={item} value={item} className="bg-slate-900 text-white">
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Số tài khoản ngân hàng
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nhập số tài khoản"
-                      value={bankAccount}
-                      onChange={(e) => setBankAccount(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1.5">Số tài khoản ngân hàng</label>
+                      <input
+                        type="text"
+                        required
+                        value={bankAccount}
+                        onChange={(e) => setBankAccount(e.target.value)}
+                        placeholder="1110105082003"
+                        className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1.5">Email</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={user?.email || ''}
+                        className="w-full bg-slate-800/20 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-500 cursor-not-allowed"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={user?.email || ''}
-                      className="w-full bg-slate-900/50 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-400 cursor-not-allowed outline-none"
-                    />
+
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-300 flex items-center gap-2">
+                    <span>ℹ️</span> Tài khoản có số dư trên 10K sẽ được duyệt chi trả tự động vào các kỳ đối soát.
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-2">
-                    Mật khẩu xác nhận (khi đổi thông tin)
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-rose-500 transition"
-                  />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    Bắt buộc nếu bạn thay đổi họ tên, số điện thoại, số tài khoản hoặc ngân hàng.
-                  </span>
-                </div>
-
-                {/* Notice Box Dark Mode */}
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3">
-                  <span className="w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    i
-                  </span>
-                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                    Tài khoản có số dư trên <strong className="text-rose-400 font-bold">10K</strong> sẽ được tự động thanh toán vào ngày 17 và 27 hàng tháng.
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="space-y-3 pt-2">
                   <button
                     type="submit"
-                    disabled={saving}
-                    className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-rose-600/30 transition text-xs flex items-center justify-center gap-1.5"
+                    disabled={loadingAction}
+                    className="w-full bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs py-3.5 rounded-xl transition shadow-lg shadow-rose-600/30"
                   >
-                    {saving ? 'Đang lưu...' : 'Lưu thay đổi 💾'}
+                    {loadingAction ? 'Đang lưu...' : 'Lưu thay đổi 💾'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm('Bạn có chắc chắn muốn yêu cầu khóa/đóng tài khoản?')) {
-                        alert('Yêu cầu đã được gửi tới quản trị viên.');
-                      }
-                    }}
-                    className="w-full bg-slate-900 border border-red-500/30 hover:bg-red-500/10 text-red-400 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center gap-1.5"
-                  >
-                    🗑️ Đóng tài khoản
-                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB 2: ĐƠN HÀNG */}
+            {activeTab === 'orders' && (
+              <div>
+                <h2 className="text-lg font-bold text-white mb-1">Danh sách đơn hàng</h2>
+                <p className="text-xs text-slate-400 mb-6">Các đơn hàng mua qua link hoàn tiền của bạn</p>
+
+                {orders.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl">
+                    <p className="text-xs text-slate-500">Chưa ghi nhận đơn hàng nào.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400">
+                          <th className="pb-3">Mã đơn</th>
+                          <th className="pb-3">Hoàn tiền</th>
+                          <th className="pb-3">Trạng thái</th>
+                          <th className="pb-3">Thời gian</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {orders.map((o) => (
+                          <tr key={o.id}>
+                            <td className="py-3 font-mono">{o.order_id}</td>
+                            <td className="py-3 text-emerald-400 font-bold">+{Number(o.cashback_amount).toLocaleString()}đ</td>
+                            <td className="py-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] ${o.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                {o.status === 'approved' ? 'Đã duyệt' : 'Chờ đối soát'}
+                              </span>
+                            </td>
+                            <td className="py-3 text-slate-500 text-[11px]">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: LỊCH SỬ RÚT TIỀN & FORM RÚT TIỀN */}
+            {activeTab === 'withdrawals' && (
+              <div className="space-y-8">
+                {/* Form Rút Tiền */}
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-1">Rút tiền về tài khoản</h2>
+                  <p className="text-xs text-slate-400 mb-4">Số dư tối thiểu để rút là 10.000 VNĐ</p>
+
+                  <form onSubmit={handleRequestWithdraw} className="bg-slate-800/40 p-4 border border-slate-700/60 rounded-xl space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-300 block mb-1">Nhập số tiền muốn rút (VNĐ)</label>
+                      <input
+                        type="number"
+                        required
+                        min="10000"
+                        step="1000"
+                        placeholder="Ví dụ: 50000"
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white font-bold outline-none focus:border-rose-500"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                      <span>Người nhận: <strong className="text-white">{fullName || 'Chưa cập nhật'}</strong></span>
+                      <span>Ngân hàng: <strong className="text-white">{bankName} - {bankAccount || 'Chưa cập nhật'}</strong></span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loadingAction}
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-600/20"
+                    >
+                      {loadingAction ? 'Đang tạo lệnh...' : 'Tạo lệnh rút tiền ngay 💸'}
+                    </button>
+                  </form>
                 </div>
-              </form>
-            </div>
-          </section>
+
+                {/* Danh sách các lần rút */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-300 mb-3">Lịch sử các yêu cầu rút tiền</h3>
+                  {withdrawals.length === 0 ? (
+                    <div className="text-center py-10 border border-dashed border-slate-800 rounded-xl">
+                      <p className="text-xs text-slate-500">Bạn chưa tạo yêu cầu rút tiền nào.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-400">
+                            <th className="pb-3">Thời gian</th>
+                            <th className="pb-3">Số tiền</th>
+                            <th className="pb-3">Tài khoản nhận</th>
+                            <th className="pb-3">Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {withdrawals.map((w) => (
+                            <tr key={w.id}>
+                              <td className="py-3 text-slate-400 text-[11px]">{new Date(w.created_at).toLocaleString('vi-VN')}</td>
+                              <td className="py-3 text-rose-400 font-bold">-{Number(w.amount).toLocaleString()} VNĐ</td>
+                              <td className="py-3 text-slate-300">
+                                {w.bank_name} <br />
+                                <span className="font-mono text-[11px] text-slate-500">{w.bank_account}</span>
+                              </td>
+                              <td className="py-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                  w.status === 'approved'
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : w.status === 'rejected'
+                                    ? 'bg-rose-500/20 text-rose-400'
+                                    : 'bg-amber-500/20 text-amber-400'
+                                }`}>
+                                  {w.status === 'approved' ? 'Đã thanh toán' : w.status === 'rejected' ? 'Bị từ chối' : 'Đang xử lý'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
