@@ -98,24 +98,41 @@ export default function Home() {
     }
   };
 
+  // Hàm chuyển đổi link gọi sang Backend Render
   const handleConvert = async () => {
-    if (!inputUrl) return alert('Vui lòng dán link sản phẩm!');
-    setLoading(true);
-    setAffiliateLink('');
-
-    try {
-      const res = await fetch('/api/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalUrl: inputUrl, userId: user ? user.id : 'guest' })
-      });
-      const data = await res.json();
-      if (data.affiliateUrl) setAffiliateLink(data.affiliateUrl);
-      else alert(data.error || 'Không thể tạo link hoàn tiền!');
-    } catch {
-      alert('Đã xảy ra lỗi khi tạo link!');
+    if (!inputUrl.trim()) {
+      alert('Vui lòng nhập link sản phẩm Shopee!');
+      return;
     }
-    setLoading(false);
+
+    setLoading(true);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_SHOPEE_CONVERTER_URL || 'https://shopee-converter-backend.onrender.com';
+
+      const response = await fetch(`${backendUrl}/convert`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: inputUrl.trim(),
+          subId: user?.id || 'guest',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data && (data.affiliateUrl || data.shortLink || data.url)) {
+        setAffiliateLink(data.affiliateUrl || data.shortLink || data.url);
+      } else {
+        alert(data?.message || data?.error || 'Không thể tạo link hoàn tiền cho sản phẩm này!');
+      }
+    } catch (error) {
+      console.error('Lỗi khi convert link:', error);
+      alert('Có lỗi xảy ra khi kết nối máy chủ hoàn tiền!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyCode = (voucher: any) => {
@@ -235,7 +252,7 @@ export default function Home() {
                 onClick={handleConvert}
                 disabled={loading}
                 type="button"
-                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition"
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Đang xử lý...' : 'Lấy Link Hoàn Tiền'}
               </button>
@@ -261,7 +278,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MỤC SẢN PHẨM BÁN CHẠY (HOT DEALS) */}
+      {/* Sản phẩm Hot */}
       {hotProducts.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 pb-12">
           <div className="flex items-center justify-between mb-6">
