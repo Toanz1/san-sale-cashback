@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Điền Affiliate ID của bạn hoặc cấu hình trong Vercel Environment Variables
-const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '1738491029';
+const SHOPEE_AFFILIATE_ID = '17361810588';
 
 // Hàm mở link rút gọn chống bị Shopee chặn trên server Vercel
 async function resolveShopeeUrl(shortUrl) {
