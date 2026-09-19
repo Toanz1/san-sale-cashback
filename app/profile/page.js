@@ -8,16 +8,20 @@ export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('withdrawals'); // Mặc định mở tab rút tiền
+  const [activeTab, setActiveTab] = useState('withdrawals'); // 'profile' | 'orders' | 'withdrawals'
 
-  // State form thông tin
+  // State thông tin cá nhân & ngân hàng
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [bankName, setBankName] = useState('MB Bank (Quân Đội)');
   const [bankAccount, setBankAccount] = useState('');
 
+  // State mật khẩu rút tiền riêng biệt
+  const [newWithdrawPin, setNewWithdrawPin] = useState('');
+
   // State rút tiền & lịch sử
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [inputPin, setInputPin] = useState('');
   const [withdrawals, setWithdrawals] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loadingAction, setLoadingAction] = useState(false);
@@ -44,51 +48,71 @@ export default function AccountPage() {
       setBankAccount(prof.bank_account || '');
     }
 
-    // Lấy lịch sử rút tiền & đơn hàng
     fetchWithdrawals(user.id);
     fetchOrders(user.id);
   };
 
   const fetchWithdrawals = async (uid) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('withdrawals')
       .select('*')
       .eq('user_id', uid)
       .order('created_at', { ascending: false });
-    if (!error && data) setWithdrawals(data);
+    if (data) setWithdrawals(data);
   };
 
   const fetchOrders = async (uid) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('cashback_orders')
       .select('*')
       .eq('user_id', uid)
       .order('created_at', { ascending: false });
-    if (!error && data) setOrders(data);
+    if (data) setOrders(data);
   };
 
-  // Cập nhật thông tin ngân hàng
+  // Lưu thông tin cá nhân & Đặt mật khẩu rút tiền mới
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setLoadingAction(true);
-    const { error } = await supabase.from('profiles').update({
+
+    const updatePayload = {
       full_name: fullName,
       phone: phone,
       bank_name: bankName,
-      bank_account: bankAccount
-    }).eq('id', user.id);
+      bank_account: bankAccount,
+    };
+
+    // Nếu người dùng có nhập mật khẩu rút tiền mới thì cập nhật
+    if (newWithdrawPin.trim()) {
+      updatePayload.withdraw_pin = newWithdrawPin.trim();
+    }
+
+    const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
 
     setLoadingAction(false);
-    if (error) alert('Lỗi cập nhật: ' + error.message);
-    else alert('Lưu thông tin thành công!');
+    if (error) {
+      alert('Lỗi cập nhật: ' + error.message);
+    } else {
+      setProfile(prev => ({ ...prev, ...updatePayload }));
+      setNewWithdrawPin('');
+      alert('Lưu thông tin thành công!');
+    }
   };
 
-  // Gửi lệnh rút tiền
+  // Gửi lệnh rút tiền kèm kiểm tra mật khẩu rút tiền tự đặt
   const handleRequestWithdraw = async (e) => {
     e.preventDefault();
     const amount = Number(withdrawAmount);
     const currentBalance = Number(profile?.balance || 0);
 
+    // 1. Kiểm tra tài khoản đã tạo mật khẩu rút tiền chưa
+    if (!profile?.withdraw_pin) {
+      alert('Bạn chưa thiết lập Mật khẩu rút tiền! Vui lòng sang tab "Thông tin tài khoản" để đặt mật khẩu trước.');
+      setActiveTab('profile');
+      return;
+    }
+
+    // 2. Kiểm tra thông tin ngân hàng
     if (!bankAccount || !fullName) {
       alert('Vui lòng cập nhật đầy đủ Số tài khoản và Họ tên ở tab Thông tin tài khoản trước!');
       setActiveTab('profile');
@@ -102,6 +126,12 @@ export default function AccountPage() {
 
     if (amount > currentBalance) {
       alert('Số dư khả dụng không đủ!');
+      return;
+    }
+
+    // 3. So khớp mật khẩu rút tiền đã tự đặt
+    if (inputPin.trim() !== String(profile.withdraw_pin).trim()) {
+      alert('Mật khẩu rút tiền không đúng! Vui lòng kiểm tra lại.');
       return;
     }
 
@@ -124,14 +154,15 @@ export default function AccountPage() {
       return;
     }
 
-    // Trừ trực tiếp số dư khả dụng
+    // Trừ số dư khả dụng
     const newBalance = currentBalance - amount;
     await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
     setProfile(prev => ({ ...prev, balance: newBalance }));
     setWithdrawAmount('');
+    setInputPin('');
     setLoadingAction(false);
-    alert('Đã gửi yêu cầu rút tiền thành công! Vui lòng chờ đối soát thanh toán.');
+    alert('Tạo lệnh rút tiền thành công! Vui lòng chờ đối soát thanh toán.');
     fetchWithdrawals(user.id);
   };
 
@@ -140,7 +171,6 @@ export default function AccountPage() {
     router.push('/');
   };
 
-  // Hàm render nhãn trạng thái chuẩn xác 100%
   const renderStatusBadge = (status, note) => {
     if (status === 'completed' || status === 'approved' || status === 'success') {
       return (
@@ -206,7 +236,7 @@ export default function AccountPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Cột trái: Profile Card */}
+          {/* Cột trái */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 p-6 text-white shadow-xl shadow-rose-950/20 text-center">
               <div className="w-16 h-16 mx-auto rounded-full bg-slate-900/90 border-2 border-white/20 flex items-center justify-center text-2xl font-black text-white mb-3">
@@ -226,7 +256,7 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Menu điều hướng */}
+            {/* Menu Tabs */}
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2 space-y-1">
               <button
                 onClick={() => setActiveTab('profile')}
@@ -270,9 +300,9 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* Cột phải: Nội dung Tab */}
+          {/* Cột phải */}
           <div className="lg:col-span-8 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8">
-            {/* TAB 1: THÔNG TIN TÀI KHOẢN */}
+            {/* TAB 1: THÔNG TIN CÁ NHÂN & CÀI ĐẶT MẬT KHẨU RÚT TIỀN */}
             {activeTab === 'profile' && (
               <div>
                 <h2 className="text-lg font-bold text-white mb-1">Thông tin cá nhân</h2>
@@ -347,8 +377,26 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-[11px] text-rose-300 flex items-center gap-2">
-                    <span>ℹ️</span> Tài khoản có số dư trên 10K sẽ được duyệt chi trả tự động vào các kỳ đối soát.
+                  {/* KHỐI ĐẶT MẬT KHẨU RÚT TIỀN TỰ ĐẶT */}
+                  <div className="p-4 bg-slate-850 bg-slate-800/30 border border-slate-700/70 rounded-xl space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                        <span>🔐</span> Mật khẩu rút tiền riêng (Tự đặt)
+                      </label>
+                      <span className="text-[11px] text-slate-400">
+                        Trạng thái: {profile?.withdraw_pin ? <strong className="text-emerald-400">Đã cài đặt</strong> : <strong className="text-rose-400">Chưa đặt</strong>}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Mật khẩu dùng để xác nhận mỗi khi rút tiền (nhập từ 4-6 số hoặc ký tự tùy bạn chọn). Để trống nếu không muốn thay đổi.
+                    </p>
+                    <input
+                      type="password"
+                      placeholder={profile?.withdraw_pin ? "Nhập mật khẩu rút tiền mới nếu muốn đổi..." : "Thiết lập mật khẩu rút tiền mới..."}
+                      value={newWithdrawPin}
+                      onChange={(e) => setNewWithdrawPin(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-amber-500"
+                    />
                   </div>
 
                   <button
@@ -403,10 +451,9 @@ export default function AccountPage() {
               </div>
             )}
 
-            {/* TAB 3: LỊCH SỬ RÚT TIỀN & FORM RÚT TIỀN */}
+            {/* TAB 3: RÚT TIỀN & NHẬP MẬT KHẨU RÚT TIỀN ĐÃ ĐẶT */}
             {activeTab === 'withdrawals' && (
               <div className="space-y-8">
-                {/* Form Rút Tiền */}
                 <div>
                   <h2 className="text-lg font-bold text-white mb-1">Rút tiền về tài khoản</h2>
                   <p className="text-xs text-slate-400 mb-4">Số dư tối thiểu để rút là 10.000 VNĐ</p>
@@ -425,6 +472,33 @@ export default function AccountPage() {
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white font-bold outline-none focus:border-rose-500"
                       />
                     </div>
+
+                    {/* Ô NHẬP MẬT KHẨU RÚT TIỀN */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs text-slate-300">
+                          Mật khẩu rút tiền <span className="text-rose-400 font-bold">*</span>
+                        </label>
+                        {!profile?.withdraw_pin && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('profile')}
+                            className="text-[11px] text-amber-400 hover:underline"
+                          >
+                            👉 Bấm vào đây để đặt mật khẩu rút tiền trước
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="password"
+                        required
+                        placeholder={profile?.withdraw_pin ? "Nhập mật khẩu rút tiền đã đặt của bạn" : "Bạn chưa đặt mật khẩu rút tiền"}
+                        value={inputPin}
+                        onChange={(e) => setInputPin(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
+                      />
+                    </div>
+
                     <div className="flex items-center justify-between text-xs text-slate-400 px-1">
                       <span>Người nhận: <strong className="text-white">{fullName || 'Chưa cập nhật'}</strong></span>
                       <span>Ngân hàng: <strong className="text-white">{bankName} - {bankAccount || 'Chưa cập nhật'}</strong></span>
@@ -435,12 +509,12 @@ export default function AccountPage() {
                       disabled={loadingAction}
                       className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-600/20"
                     >
-                      {loadingAction ? 'Đang tạo lệnh...' : 'Tạo lệnh rút tiền ngay 💸'}
+                      {loadingAction ? 'Đang kiểm tra...' : 'Xác nhận & Tạo lệnh rút tiền 💸'}
                     </button>
                   </form>
                 </div>
 
-                {/* Danh sách các lần rút */}
+                {/* Danh sách rút tiền */}
                 <div>
                   <h3 className="text-sm font-bold text-slate-300 mb-3">Lịch sử các yêu cầu rút tiền</h3>
                   {withdrawals.length === 0 ? (
