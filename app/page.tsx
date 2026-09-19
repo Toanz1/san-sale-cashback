@@ -11,15 +11,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
-  
 
   const ADMIN_EMAIL = 'toanzin00001@gmail.com';
 
   const defaultVouchers = [
-    { id: '1', platform: 'Shopee', code: 'SHOPEE50K', title: 'Giảm 50K cho đơn từ 250K', category: 'Toàn sàn', expire_time: 'Hôm nay' },
-    { id: '2', platform: 'Shopee', code: 'FREESHIPXTRA', title: 'Miễn phí vận chuyển tới 70K', category: 'Freeship', expire_time: '23:59' },
-    { id: '3', platform: 'Lazada', code: 'LAZ30K', title: 'Giảm 30K đơn từ 150K', category: 'Thu thập', expire_time: 'Sắp hết' },
-    { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày' },
+    { id: '1', platform: 'Shopee', code: 'SHOPEE50K', title: 'Giảm 50K cho đơn từ 250K', category: 'Toàn sàn', expire_time: 'Hôm nay', affiliate_link: '' },
+    { id: '2', platform: 'Shopee', code: 'FREESHIPXTRA', title: 'Miễn phí vận chuyển tới 70K', category: 'Freeship', expire_time: '23:59', affiliate_link: '' },
+    { id: '3', platform: 'Lazada', code: 'LAZ30K', title: 'Giảm 30K đơn từ 150K', category: 'Thu thập', expire_time: 'Sắp hết', affiliate_link: '' },
+    { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày', affiliate_link: '' },
   ];
 
   const loadUserProfile = async (currentUser: any) => {
@@ -69,7 +68,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // 1. Kiểm tra session hiện tại
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user || null;
@@ -82,7 +80,6 @@ export default function Home() {
     initAuth();
     fetchVouchers();
 
-    // 2. Lắng nghe thay đổi trạng thái đăng nhập (đặc biệt khi Google OAuth redirect về)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -140,28 +137,15 @@ export default function Home() {
   };
 
   const handleCopyCode = (voucher: any) => {
-  navigator.clipboard.writeText(voucher.code);
-  setCopiedVoucher(voucher.code);
-  setTimeout(() => setCopiedVoucher(null), 2000);
+    navigator.clipboard.writeText(voucher.code);
+    setCopiedVoucher(voucher.code);
+    setTimeout(() => setCopiedVoucher(null), 2000);
 
-  // Nếu voucher có link tiếp thị liên kết, tự động mở sang tab mới
-  if (voucher.affiliate_link) {
-    window.open(voucher.affiliate_link, '_blank');
-  }
-};
-<div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
-  <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
-    {v.code}
-  </span>
-  <button
-    onClick={() => handleCopyCode(v)}
-    type="button"
-    className="text-xs font-semibold text-slate-200 hover:text-white bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg transition shadow-sm flex items-center gap-1"
-  >
-    <span>{copiedVoucher === v.code ? '✓ Đã chép' : 'Sao chép & Dùng'}</span>
-    {v.affiliate_link && <span className="text-[10px]">➔</span>}
-  </button>
-</div>
+    const link = voucher.affiliate_link || voucher.affiliate_url;
+    if (link) {
+      window.open(link, '_blank');
+    }
+  };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên';
@@ -319,48 +303,40 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {vouchers.map((v) => (
-            <div
-              key={v.id}
-              className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-200">
-                    {v.platform}
-                  </span>
-                  <span className="text-[10px] text-amber-400 font-semibold">{v.category || v.tag || 'Ưu đãi'}</span>
+          {vouchers.map((v) => {
+            const hasLink = Boolean(v.affiliate_link || v.affiliate_url);
+            return (
+              <div
+                key={v.id}
+                className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between hover:border-slate-600 transition"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-200">
+                      {v.platform}
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-semibold">{v.category || v.tag || 'Ưu đãi'}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-white line-clamp-2">{v.title || v.description}</p>
+                  <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expire_time || v.expires || 'Hôm nay'}</p>
                 </div>
-                <p className="text-sm font-semibold text-white line-clamp-2">{v.title || v.description}</p>
-                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expire_time || v.expires || 'Hôm nay'}</p>
-              </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
-                <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
-                  {v.code}
-                </span>
-                <div className="flex items-center gap-1.5">
+                <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
+                    {v.code}
+                  </span>
                   <button
-                    onClick={() => handleCopyCode(v.code)}
+                    onClick={() => handleCopyCode(v)}
                     type="button"
-                    className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition"
+                    className="text-xs font-semibold text-slate-200 hover:text-white bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg transition shadow-sm flex items-center gap-1.5"
                   >
-                    {copiedVoucher === v.code ? 'Đã chép!' : 'Sao chép'}
+                    <span>{copiedVoucher === v.code ? '✓ Đã chép' : 'Sao chép & Dùng'}</span>
+                    {hasLink && <span className="text-[10px]">➔</span>}
                   </button>
-                  {v.affiliate_url && (
-                    <a
-                      href={v.affiliate_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-lg transition"
-                    >
-                      Dùng mã ➔
-                    </a>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
