@@ -38,7 +38,7 @@ export default function AdminPage() {
         .order('created_at', { ascending: false });
       setUsers(usersData || []);
 
-      // 2. Rút tiền (không join bảng để tránh crash ngầm)
+      // 2. Rút tiền
       const { data: withData, error: withErr } = await supabase
         .from('withdrawals')
         .select('*')
@@ -82,32 +82,69 @@ export default function AdminPage() {
   const handleApproveWithdrawal = async (withdraw) => {
     if (!confirm(`Xác nhận đã chuyển khoản ${Number(withdraw.amount || 0).toLocaleString()}đ cho khách?`)) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('withdrawals')
       .update({ status: 'completed' })
-      .eq('id', withdraw.id);
+      .eq('id', withdraw.id)
+      .select();
 
     if (error) {
-      alert('Lỗi: ' + error.message);
-    } else {
-      alert('Duyệt rút tiền thành công!');
-      fetchAllData();
+      alert('Lỗi cập nhật Supabase: ' + error.message);
+      return;
     }
+
+    if (!data || data.length === 0) {
+      alert('Không thể cập nhật hoặc bị RLS chặn quyền!');
+      return;
+    }
+
+    alert('Duyệt rút tiền thành công!');
+    fetchAllData();
   };
 
+  // ================= THAO TÁC TỪ CHỐI RÚT TIỀN =================
   const handleRejectWithdrawal = async (withdraw) => {
     const reason = prompt('Nhập lý do từ chối (Tiền sẽ được hoàn trả lại ví user):', 'Sai thông tin số tài khoản');
     if (reason === null) return;
 
-    await supabase.from('withdrawals').update({ status: 'rejected', note: reason }).eq('id', withdraw.id);
+    // 1. Cập nhật trạng thái lệnh rút
+    const { data: updatedWithdrawal, error: withdrawErr } = await supabase
+      .from('withdrawals')
+      .update({ status: 'rejected', note: reason })
+      .eq('id', withdraw.id)
+      .select();
 
-    const targetUser = users.find((u) => String(u.id) === String(withdraw.user_id));
-    const currentBalance = Number(targetUser?.balance || 0);
+    if (withdrawErr) {
+      alert('Lỗi cập nhật lệnh rút: ' + withdrawErr.message);
+      return;
+    }
+
+    if (!updatedWithdrawal || updatedWithdrawal.length === 0) {
+      alert('Không thể từ chối hoặc bị RLS chặn quyền trên bảng withdrawals!');
+      return;
+    }
+
+    // 2. Lấy số dư mới nhất từ Database để hoàn trả chính xác
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('balance')
+      .eq('id', withdraw.user_id)
+      .single();
+
+    const currentBalance = Number(currentProfile?.balance || 0);
     const newBalance = currentBalance + Number(withdraw.amount || 0);
 
-    await supabase.from('profiles').update({ balance: newBalance }).eq('id', withdraw.user_id);
+    const { error: profileErr } = await supabase
+      .from('profiles')
+      .update({ balance: newBalance })
+      .eq('id', withdraw.user_id);
 
-    alert('Đã từ chối lệnh và hoàn lại tiền vào ví của thành viên!');
+    if (profileErr) {
+      alert('Đã từ chối lệnh nhưng hoàn tiền vào ví lỗi: ' + profileErr.message);
+    } else {
+      alert(`Đã từ chối và hoàn lại ${Number(withdraw.amount || 0).toLocaleString()}đ vào ví của thành viên!`);
+    }
+
     fetchAllData();
   };
 
@@ -259,6 +296,11 @@ export default function AdminPage() {
                         {(w?.account_holder || w?.account_name) && (
                           <div className="text-[11px] text-slate-400 uppercase">
                             Chủ TK: {w?.account_holder || w?.account_name}
+                          </div>
+                        )}
+                        {w?.note && (
+                          <div className="text-[10px] text-rose-400 italic mt-0.5">
+                            Lý do hủy: {w?.note}
                           </div>
                         )}
                       </td>

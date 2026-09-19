@@ -8,7 +8,7 @@ export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'orders' | 'withdrawals'
+  const [activeTab, setActiveTab] = useState('withdrawals'); // Mặc định mở tab rút tiền
 
   // State form thông tin
   const [fullName, setFullName] = useState('');
@@ -44,20 +44,27 @@ export default function AccountPage() {
       setBankAccount(prof.bank_account || '');
     }
 
-    // Lấy lịch sử rút tiền
+    // Lấy lịch sử rút tiền & đơn hàng
     fetchWithdrawals(user.id);
-    // Lấy danh sách đơn hàng
     fetchOrders(user.id);
   };
 
   const fetchWithdrawals = async (uid) => {
-    const { data } = await supabase.from('withdrawals').select('*').eq('user_id', uid).order('created_at', { ascending: false });
-    if (data) setWithdrawals(data);
+    const { data, error } = await supabase
+      .from('withdrawals')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    if (!error && data) setWithdrawals(data);
   };
 
   const fetchOrders = async (uid) => {
-    const { data } = await supabase.from('cashback_orders').select('*').eq('user_id', uid).order('created_at', { ascending: false });
-    if (data) setOrders(data);
+    const { data, error } = await supabase
+      .from('cashback_orders')
+      .select('*')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false });
+    if (!error && data) setOrders(data);
   };
 
   // Cập nhật thông tin ngân hàng
@@ -100,7 +107,6 @@ export default function AccountPage() {
 
     setLoadingAction(true);
 
-    // Gửi đồng bộ toàn bộ các tên cột có thể có trong bảng withdrawals
     const { error: withdrawErr } = await supabase.from('withdrawals').insert({
       user_id: user.id,
       amount: amount,
@@ -118,7 +124,7 @@ export default function AccountPage() {
       return;
     }
 
-    // Trừ trực tiếp số dư tạm tính
+    // Trừ trực tiếp số dư khả dụng
     const newBalance = currentBalance - amount;
     await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
@@ -132,6 +138,29 @@ export default function AccountPage() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
+  };
+
+  // Hàm render nhãn trạng thái chuẩn xác 100%
+  const renderStatusBadge = (status, note) => {
+    if (status === 'completed' || status === 'approved' || status === 'success') {
+      return (
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          Đã thanh toán
+        </span>
+      );
+    }
+    if (status === 'rejected' || status === 'cancelled') {
+      return (
+        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20" title={note || ''}>
+          Bị từ chối {note ? `(${note})` : ''}
+        </span>
+      );
+    }
+    return (
+      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
+        Đang xử lý
+      </span>
+    );
   };
 
   return (
@@ -177,14 +206,13 @@ export default function AccountPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Cột trái */}
+          {/* Cột trái: Profile Card */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Card số dư */}
             <div className="rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 p-6 text-white shadow-xl shadow-rose-950/20 text-center">
               <div className="w-16 h-16 mx-auto rounded-full bg-slate-900/90 border-2 border-white/20 flex items-center justify-center text-2xl font-black text-white mb-3">
                 {user?.email?.charAt(0).toUpperCase()}
               </div>
-              <p className="font-bold text-sm">{user?.email?.split('@')[0]}</p>
+              <p className="font-bold text-sm">{fullName || user?.email?.split('@')[0]}</p>
               <p className="text-xs text-rose-100/80 mb-6">{user?.email}</p>
 
               <div className="bg-slate-900/90 border border-white/10 rounded-xl p-4 flex items-center justify-between text-left">
@@ -198,7 +226,7 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Menu điều hướng Tab */}
+            {/* Menu điều hướng */}
             <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-2 space-y-1">
               <button
                 onClick={() => setActiveTab('profile')}
@@ -242,7 +270,7 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* Cột phải: Nội dung theo Tab */}
+          {/* Cột phải: Nội dung Tab */}
           <div className="lg:col-span-8 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8">
             {/* TAB 1: THÔNG TIN TÀI KHOẢN */}
             {activeTab === 'profile' && (
@@ -260,7 +288,7 @@ export default function AccountPage() {
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="VO THANH TOAN"
-                        className="w-full bg-slate-850 bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
+                        className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
                       />
                     </div>
                     <div>
@@ -427,28 +455,24 @@ export default function AccountPage() {
                             <th className="pb-3">Thời gian</th>
                             <th className="pb-3">Số tiền</th>
                             <th className="pb-3">Tài khoản nhận</th>
-                            <th className="pb-3">Trạng thái</th>
+                            <th className="pb-3 text-center">Trạng thái</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                           {withdrawals.map((w) => (
-                            <tr key={w.id}>
-                              <td className="py-3 text-slate-400 text-[11px]">{new Date(w.created_at).toLocaleString('vi-VN')}</td>
-                              <td className="py-3 text-rose-400 font-bold">-{Number(w.amount).toLocaleString()} VNĐ</td>
+                            <tr key={w.id} className="hover:bg-slate-800/30">
+                              <td className="py-3 text-slate-400 text-[11px] whitespace-nowrap">
+                                {new Date(w.created_at).toLocaleString('vi-VN')}
+                              </td>
+                              <td className="py-3 text-rose-400 font-bold whitespace-nowrap">
+                                -{Number(w.amount).toLocaleString()} VNĐ
+                              </td>
                               <td className="py-3 text-slate-300">
-                                {w.bank_name} <br />
+                                <div>{w.bank_name}</div>
                                 <span className="font-mono text-[11px] text-slate-500">{w.bank_account || w.account_number}</span>
                               </td>
-                              <td className="py-3">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                  w.status === 'approved'
-                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                    : w.status === 'rejected'
-                                    ? 'bg-rose-500/20 text-rose-400'
-                                    : 'bg-amber-500/20 text-amber-400'
-                                }`}>
-                                  {w.status === 'approved' ? 'Đã thanh toán' : w.status === 'rejected' ? 'Bị từ chối' : 'Đang xử lý'}
-                                </span>
+                              <td className="py-3 text-center whitespace-nowrap">
+                                {renderStatusBadge(w.status, w.note)}
                               </td>
                             </tr>
                           ))}
