@@ -89,7 +89,7 @@ export default function AccountPage() {
     }
 
     if (amount < 10000) {
-      alert('Số tiền rút tối thiểu là 10.000đ!');
+      alert('Số tiền rút tối thiểu là 10.000 VNĐ!');
       return;
     }
 
@@ -100,12 +100,13 @@ export default function AccountPage() {
 
     setLoadingAction(true);
 
-    // 1. Tạo lệnh rút tiền
+    // Tạo lệnh rút tiền (gửi đồng thời account_number và bank_account)
     const { error: withdrawErr } = await supabase.from('withdrawals').insert({
       user_id: user.id,
       amount: amount,
       bank_name: bankName,
       bank_account: bankAccount,
+      account_number: bankAccount,
       account_holder: fullName,
       status: 'pending'
     });
@@ -116,7 +117,7 @@ export default function AccountPage() {
       return;
     }
 
-    // 2. Trừ trực tiếp số dư tạm tính
+    // Trừ trực tiếp số dư tạm tính
     const newBalance = currentBalance - amount;
     await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
@@ -258,7 +259,7 @@ export default function AccountPage() {
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="VO THANH TOAN"
-                        className="w-full bg-slate-850 bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
+                        className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
                       />
                     </div>
                     <div>
@@ -435,7 +436,7 @@ export default function AccountPage() {
                               <td className="py-3 text-rose-400 font-bold">-{Number(w.amount).toLocaleString()} VNĐ</td>
                               <td className="py-3 text-slate-300">
                                 {w.bank_name} <br />
-                                <span className="font-mono text-[11px] text-slate-500">{w.bank_account}</span>
+                                <span className="font-mono text-[11px] text-slate-500">{w.bank_account || w.account_number}</span>
                               </td>
                               <td className="py-3">
                                 <span className={`px-2 py-0.5 rounded text-[10px] ${
