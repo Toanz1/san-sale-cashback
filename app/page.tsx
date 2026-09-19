@@ -11,6 +11,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
+  
 
   const ADMIN_EMAIL = 'toanzin00001@gmail.com';
 
@@ -138,11 +139,29 @@ export default function Home() {
     setLoading(false);
   };
 
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedVoucher(code);
-    setTimeout(() => setCopiedVoucher(null), 2000);
-  };
+  const handleCopyCode = (voucher: any) => {
+  navigator.clipboard.writeText(voucher.code);
+  setCopiedVoucher(voucher.code);
+  setTimeout(() => setCopiedVoucher(null), 2000);
+
+  // Nếu voucher có link tiếp thị liên kết, tự động mở sang tab mới
+  if (voucher.affiliate_link) {
+    window.open(voucher.affiliate_link, '_blank');
+  }
+};
+<div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+  <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
+    {v.code}
+  </span>
+  <button
+    onClick={() => handleCopyCode(v)}
+    type="button"
+    className="text-xs font-semibold text-slate-200 hover:text-white bg-rose-600 hover:bg-rose-500 px-3 py-1.5 rounded-lg transition shadow-sm flex items-center gap-1"
+  >
+    <span>{copiedVoucher === v.code ? '✓ Đã chép' : 'Sao chép & Dùng'}</span>
+    {v.affiliate_link && <span className="text-[10px]">➔</span>}
+  </button>
+</div>
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên';

@@ -16,14 +16,14 @@ export default function AdminPage() {
   const [orders, setOrders] = useState([]);
   const [vouchers, setVouchers] = useState([]);
 
-  // State thêm voucher mới
+  // State thêm voucher mới có hỗ trợ affiliate_link
   const [newVoucher, setNewVoucher] = useState({
     platform: 'Shopee',
     code: '',
     title: '',
     category: 'Toàn sàn',
     expire_time: 'Hôm nay',
-    link: ''
+    affiliate_link: ''
   });
 
   const [searchUser, setSearchUser] = useState('');
@@ -161,7 +161,8 @@ export default function AdminPage() {
         code: newVoucher.code.toUpperCase().trim(),
         title: newVoucher.title,
         category: newVoucher.category,
-        expire_time: newVoucher.expire_time
+        expire_time: newVoucher.expire_time,
+        affiliate_link: newVoucher.affiliate_link.trim() || null
       }
     ]);
 
@@ -175,7 +176,7 @@ export default function AdminPage() {
         title: '',
         category: 'Toàn sàn',
         expire_time: 'Hôm nay',
-        link: ''
+        affiliate_link: ''
       });
       fetchAllData();
     }
@@ -330,107 +331,151 @@ export default function AdminPage() {
         </div>
 
         {/* ================= TAB 1: BẢNG RÚT TIỀN ================= */}
-        {activeTab === 'withdrawals' && (
-          <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
-            <h2 className="text-base font-bold text-white mb-4">
-              Danh Sách Yêu Cầu Rút Tiền Của Thành Viên
-            </h2>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/80 border-b border-slate-700 text-slate-400 uppercase text-[11px]">
-                    <th className="py-3 px-4">Mã Lệnh</th>
-                    <th className="py-3 px-4">User</th>
-                    <th className="py-3 px-4">Số Tiền</th>
-                    <th className="py-3 px-4">Thông Tin Nhận Tiền</th>
-                    <th className="py-3 px-4">Thời Gian</th>
-                    <th className="py-3 px-4 text-center">Trạng Thái</th>
-                    <th className="py-3 px-4 text-right">Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/60">
-                  {withdrawals.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-12 text-slate-500">
-                        Chưa có yêu cầu rút tiền nào
-                      </td>
-                    </tr>
-                  ) : (
-                    withdrawals.map((w) => (
-                      <tr key={String(w?.id)} className="hover:bg-slate-700/20">
-                        <td className="py-3 px-4 font-mono font-bold text-slate-300">
-                          #{String(w?.id || '').slice(0, 8)}
-                        </td>
-                        <td className="py-3 px-4 font-semibold text-white">
-                          {getUserEmail(w?.user_id)}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-rose-400 text-sm">
-                          {Number(w?.amount || 0).toLocaleString()}đ
-                        </td>
-                        <td className="py-3 px-4 text-slate-300">
-                          <div>
-                            <span className="font-bold text-white">{w?.bank_name || 'Ngân hàng'}</span> - {w?.bank_account || w?.account_number || 'N/A'}
-                          </div>
-                          {(w?.account_holder || w?.account_name) && (
-                            <div className="text-[11px] text-slate-400 uppercase">
-                              Chủ TK: {w?.account_holder || w?.account_name}
-                            </div>
-                          )}
-                          {w?.note && (
-                            <div className="text-[10px] text-rose-400 italic mt-0.5">
-                              Lý do: {w?.note}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
-                          {formatDate(w?.created_at)}
-                        </td>
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          {(w?.status === 'completed' || w?.status === 'approved') && (
-                            <span className="px-2.5 py-1 text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                              Đã chuyển khoản
-                            </span>
-                          )}
-                          {w?.status === 'pending' && (
-                            <span className="px-2.5 py-1 text-[10px] rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold animate-pulse">
-                              Chờ xử lý
-                            </span>
-                          )}
-                          {w?.status === 'rejected' && (
-                            <span className="px-2.5 py-1 text-[10px] rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
-                              Đã từ chối
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {w?.status === 'pending' ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleApproveWithdrawal(w)}
-                                className="px-3 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition"
-                              >
-                                Duyệt
-                              </button>
-                              <button
-                                onClick={() => handleRejectWithdrawal(w)}
-                                className="px-3 py-1 text-[11px] font-bold bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg transition"
-                              >
-                                Từ chối
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-slate-500 text-xs font-medium">Đã chốt</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+        {activeTab === 'vouchers' && (
+  <div className="space-y-6">
+    {/* Form thêm Voucher */}
+    <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
+      <h2 className="text-base font-bold text-white mb-4">Thêm Mã Giảm Giá Mới</h2>
+      <form onSubmit={handleAddVoucher} className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Sàn TMĐT</label>
+            <select
+              value={newVoucher.platform}
+              onChange={(e) => setNewVoucher({ ...newVoucher, platform: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+            >
+              <option value="Shopee">Shopee</option>
+              <option value="Lazada">Lazada</option>
+              <option value="TikTok">TikTok Shop</option>
+            </select>
           </div>
-        )}
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Mã Voucher</label>
+            <input
+              type="text"
+              required
+              placeholder="VD: LAZTIETKIEM"
+              value={newVoucher.code}
+              onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-mono uppercase outline-none focus:border-rose-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Tiêu đề / Mức giảm</label>
+            <input
+              type="text"
+              required
+              placeholder="VD: Giảm 50K đơn từ 250K"
+              value={newVoucher.title}
+              onChange={(e) => setNewVoucher({ ...newVoucher, title: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Loại / Hạn dùng</label>
+            <input
+              type="text"
+              placeholder="VD: Freeship, Hôm nay"
+              value={newVoucher.expire_time}
+              onChange={(e) => setNewVoucher({ ...newVoucher, expire_time: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+            />
+          </div>
+        </div>
+
+        {/* Ô dán link Tiếp thị liên kết của Voucher */}
+        <div className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="w-full">
+            <label className="text-[11px] text-slate-400 block mb-1">
+              Link Affiliate Voucher (Link Accesstrade / Shopee Aff dẫn thẳng đến trang thu thập voucher)
+            </label>
+            <input
+              type="url"
+              placeholder="https://shorten.asia/... hoặc link tiếp thị của bạn"
+              value={newVoucher.affiliate_link}
+              onChange={(e) => setNewVoucher({ ...newVoucher, affiliate_link: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500 font-mono"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full sm:w-48 shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-rose-600/30"
+          >
+            + Thêm Voucher
+          </button>
+        </div>
+      </form>
+    </div>
+
+    {/* Danh sách Voucher */}
+    <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
+      <h2 className="text-base font-bold text-white mb-4">Danh Sách Voucher Đang Hiển Thị Trên Web</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="bg-slate-900/80 border-b border-slate-700 text-slate-400 uppercase text-[11px]">
+              <th className="py-3 px-4">Sàn</th>
+              <th className="py-3 px-4">Mã Voucher</th>
+              <th className="py-3 px-4">Nội Dung Ưu Đãi</th>
+              <th className="py-3 px-4">Link Affiliate</th>
+              <th className="py-3 px-4">Hạn Dùng</th>
+              <th className="py-3 px-4 text-right">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700/60">
+            {vouchers.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-slate-500">
+                  Chưa có voucher nào trong Database
+                </td>
+              </tr>
+            ) : (
+              vouchers.map((v) => (
+                <tr key={v.id} className="hover:bg-slate-700/20">
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-200 text-[10px] font-bold">
+                      {v.platform}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 font-mono font-bold text-rose-400">{v.code}</td>
+                  <td className="py-3 px-4 font-semibold text-white">{v.title}</td>
+                  <td className="py-3 px-4">
+                    {v.affiliate_link ? (
+                      <a
+                        href={v.affiliate_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-400 hover:underline max-w-[180px] truncate block font-mono text-[11px]"
+                      >
+                        {v.affiliate_link}
+                      </a>
+                    ) : (
+                      <span className="text-slate-500 italic">Chưa gắn link</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 text-slate-400">{v.expire_time || 'Hôm nay'}</td>
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      onClick={() => handleDeleteVoucher(v.id)}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition border border-rose-500/30"
+                    >
+                      Xóa
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* ================= TAB 2: QUẢN LÝ THÀNH VIÊN ================= */}
         {activeTab === 'users' && (
@@ -559,67 +604,85 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ================= TAB 4: QUẢN LÝ VOUCHER ================= */}
+        {/* ================= TAB 4: QUẢN LÝ VOUCHER (CÓ LINK TIẾP THỊ) ================= */}
         {activeTab === 'vouchers' && (
           <div className="space-y-6">
             {/* Form thêm Voucher */}
             <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
               <h2 className="text-base font-bold text-white mb-4">Thêm Mã Giảm Giá Mới</h2>
-              <form onSubmit={handleAddVoucher} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Sàn TMĐT</label>
-                  <select
-                    value={newVoucher.platform}
-                    onChange={(e) => setNewVoucher({ ...newVoucher, platform: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+              <form onSubmit={handleAddVoucher} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Sàn TMĐT</label>
+                    <select
+                      value={newVoucher.platform}
+                      onChange={(e) => setNewVoucher({ ...newVoucher, platform: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+                    >
+                      <option value="Shopee">Shopee</option>
+                      <option value="Lazada">Lazada</option>
+                      <option value="TikTok">TikTok Shop</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Mã Voucher</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="VD: SHOPEE50K"
+                      value={newVoucher.code}
+                      onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-mono uppercase outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Tiêu đề / Mức giảm</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="VD: Giảm 50K đơn từ 250K"
+                      value={newVoucher.title}
+                      onChange={(e) => setNewVoucher({ ...newVoucher, title: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Loại / Hạn dùng</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Freeship, Hôm nay"
+                      value={newVoucher.expire_time}
+                      onChange={(e) => setNewVoucher({ ...newVoucher, expire_time: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Hàng nhập Link Affiliate và Nút bấm */}
+                <div className="flex flex-col sm:flex-row gap-3 items-end pt-1">
+                  <div className="w-full">
+                    <label className="text-[11px] text-slate-400 block mb-1">
+                      Link Affiliate Voucher (Link tiếp thị Accesstrade / Shopee Aff dẫn đến trang mã giảm giá)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://shorten.asia/... hoặc link tiếp thị của sàn"
+                      value={newVoucher.affiliate_link}
+                      onChange={(e) => setNewVoucher({ ...newVoucher, affiliate_link: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500 font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full sm:w-48 shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-rose-600/30"
                   >
-                    <option value="Shopee">Shopee</option>
-                    <option value="Lazada">Lazada</option>
-                    <option value="TikTok">TikTok Shop</option>
-                  </select>
+                    + Thêm Voucher
+                  </button>
                 </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Mã Voucher</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: SHOPEE50K"
-                    value={newVoucher.code}
-                    onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-mono uppercase outline-none focus:border-rose-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Tiêu đề / Mức giảm</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Giảm 50K đơn từ 250K"
-                    value={newVoucher.title}
-                    onChange={(e) => setNewVoucher({ ...newVoucher, title: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Loại / Hạn dùng</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Freeship, Hôm nay"
-                    value={newVoucher.expire_time}
-                    onChange={(e) => setNewVoucher({ ...newVoucher, expire_time: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-rose-500"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-rose-600/30"
-                >
-                  + Thêm Voucher
-                </button>
               </form>
             </div>
 
@@ -633,6 +696,7 @@ export default function AdminPage() {
                       <th className="py-3 px-4">Sàn</th>
                       <th className="py-3 px-4">Mã Voucher</th>
                       <th className="py-3 px-4">Nội Dung Ưu Đãi</th>
+                      <th className="py-3 px-4">Link Tiếp Thị</th>
                       <th className="py-3 px-4">Hạn Dùng</th>
                       <th className="py-3 px-4 text-right">Thao Tác</th>
                     </tr>
@@ -640,7 +704,7 @@ export default function AdminPage() {
                   <tbody className="divide-y divide-slate-700/60">
                     {vouchers.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-12 text-slate-500">
+                        <td colSpan={6} className="text-center py-12 text-slate-500">
                           Chưa có voucher nào trong Database
                         </td>
                       </tr>
@@ -654,6 +718,20 @@ export default function AdminPage() {
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-rose-400">{v.code}</td>
                           <td className="py-3 px-4 font-semibold text-white">{v.title}</td>
+                          <td className="py-3 px-4">
+                            {v.affiliate_link ? (
+                              <a
+                                href={v.affiliate_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-400 hover:underline max-w-[200px] truncate block font-mono text-[11px]"
+                              >
+                                {v.affiliate_link}
+                              </a>
+                            ) : (
+                              <span className="text-slate-500 italic">Chưa gắn link</span>
+                            )}
+                          </td>
                           <td className="py-3 px-4 text-slate-400">{v.expire_time || 'Hôm nay'}</td>
                           <td className="py-3 px-4 text-right">
                             <button
