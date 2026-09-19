@@ -3,13 +3,12 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const origin = requestUrl.origin;
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get('code');
+  const next = searchParams.get('next') ?? '/';
 
   if (code) {
     const cookieStore = await cookies();
-
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -24,7 +23,7 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options)
               );
             } catch {
-              // Bỏ qua lỗi nếu gọi từ Server Component
+              // The `setAll` method was called from a Server Component.
             }
           },
         },
@@ -32,12 +31,11 @@ export async function GET(request: Request) {
     );
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error('Lỗi xác thực OAuth:', error.message);
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    if (!error) {
+      return NextResponse.redirect(`${origin}${next}`);
     }
   }
 
-  // Chuyển hướng về trang chủ với session đã được lưu trong cookie
-  return NextResponse.redirect(`${origin}/`);
+  // Nếu có lỗi, redirect về trang đăng nhập kèm lỗi
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_error`);
 }

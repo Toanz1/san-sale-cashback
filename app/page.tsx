@@ -21,57 +21,6 @@ export default function Home() {
     { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày' },
   ];
 
-  useEffect(() => {
-    const handleAuthInit = async () => {
-      // 1. Kiểm tra nếu URL trả về chứa hash token từ Google OAuth
-      if (typeof window !== 'undefined' && window.location.hash) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (!error && data?.session?.user) {
-            setUser(data.session.user);
-            await loadUserProfile(data.session.user);
-            // Xóa hash trên thanh địa chỉ để URL gọn gàng
-            window.history.replaceState(null, '', window.location.pathname);
-            return;
-          }
-        }
-      }
-
-      // 2. Nếu không có hash, đọc session bình thường
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await loadUserProfile(session.user);
-      }
-    };
-
-    handleAuthInit();
-    fetchVouchers();
-
-    // 3. Lắng nghe thay đổi trạng thái đăng nhập
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        await loadUserProfile(currentUser);
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
   const loadUserProfile = async (currentUser: any) => {
     try {
       const { data, error } = await supabase
@@ -117,6 +66,36 @@ export default function Home() {
       setVouchers(defaultVouchers);
     }
   };
+
+  useEffect(() => {
+    // 1. Kiểm tra session hiện tại
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+      if (currentUser) {
+        await loadUserProfile(currentUser);
+      }
+    };
+
+    initAuth();
+    fetchVouchers();
+
+    // 2. Lắng nghe thay đổi trạng thái đăng nhập (đặc biệt khi Google OAuth redirect về)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        await loadUserProfile(currentUser);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -166,7 +145,6 @@ export default function Home() {
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
-  
   const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên';
   const avatarChar = (displayName[0] || 'U').toUpperCase();
 
@@ -190,7 +168,6 @@ export default function Home() {
           <div>
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* ĐÃ SỬA TẠI ĐÂY: Thẻ div đổi thành Link href="/profile" */}
                 <Link
                   href="/profile"
                   title="Đi đến Trang cá nhân"
@@ -204,7 +181,6 @@ export default function Home() {
                   </span>
                 </Link>
 
-                {/* Nút Admin */}
                 {isUserAdmin && (
                   <Link
                     href="/admin"
@@ -214,7 +190,6 @@ export default function Home() {
                   </Link>
                 )}
 
-                {/* Số dư ví -> Click dẫn vào trang rút tiền/ví cá nhân */}
                 <Link
                   href="/profile"
                   className="text-xs bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition"
@@ -335,23 +310,35 @@ export default function Home() {
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-200">
                     {v.platform}
                   </span>
-                  <span className="text-[10px] text-amber-400 font-semibold">{v.category || 'Ưu đãi'}</span>
+                  <span className="text-[10px] text-amber-400 font-semibold">{v.category || v.tag || 'Ưu đãi'}</span>
                 </div>
-                <p className="text-sm font-semibold text-white line-clamp-2">{v.title}</p>
-                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expire_time || 'Hôm nay'}</p>
+                <p className="text-sm font-semibold text-white line-clamp-2">{v.title || v.description}</p>
+                <p className="text-[11px] text-slate-400 mt-2">Hết hạn: {v.expire_time || v.expires || 'Hôm nay'}</p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between">
+              <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
                 <span className="font-mono text-xs font-bold text-rose-400 tracking-wider bg-rose-500/10 px-2 py-1 rounded">
                   {v.code}
                 </span>
-                <button
-                  onClick={() => handleCopyCode(v.code)}
-                  type="button"
-                  className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition"
-                >
-                  {copiedVoucher === v.code ? 'Đã chép!' : 'Sao chép'}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleCopyCode(v.code)}
+                    type="button"
+                    className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg transition"
+                  >
+                    {copiedVoucher === v.code ? 'Đã chép!' : 'Sao chép'}
+                  </button>
+                  {v.affiliate_url && (
+                    <a
+                      href={v.affiliate_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-lg transition"
+                    >
+                      Dùng mã ➔
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ))}

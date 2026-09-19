@@ -40,7 +40,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined,
         },
       });
       if (error) throw error;
@@ -49,7 +49,7 @@ export default function LoginPage() {
       setGoogleLoading(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
