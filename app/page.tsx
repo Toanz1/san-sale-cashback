@@ -43,6 +43,7 @@ export default function Home() {
         const fallbackProfile = {
           id: currentUser.id,
           email: currentUser.email,
+          username: `user_${currentUser.id.substring(0, 6)}`,
           balance: 0,
           role: currentUser.email === ADMIN_EMAIL ? 'admin' : 'user'
         };
@@ -135,10 +136,16 @@ export default function Home() {
     setErrorMessage('');
 
     try {
+      // Ưu tiên dùng Username riêng của user làm Sub ID theo dõi đơn
+      const trackingSubId = profile?.username || user?.id || 'guest';
+
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalUrl: inputUrl.trim(), userId: user.id })
+        body: JSON.stringify({ 
+          originalUrl: inputUrl.trim(), 
+          userId: trackingSubId 
+        })
       });
       const data = await res.json();
       if (data.affiliateUrl) {
@@ -162,8 +169,12 @@ export default function Home() {
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
-  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên';
-  const avatarChar = (displayName[0] || 'U').toUpperCase();
+  
+  // Ưu tiên hiển thị @username riêng biệt
+  const displayName = profile?.username 
+    ? `@${profile.username}` 
+    : (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên');
+  const avatarChar = (displayName.replace('@', '')[0] || 'U').toUpperCase();
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
@@ -188,6 +199,16 @@ export default function Home() {
           {/* Menu Điều Hướng & Tài Khoản bên phải */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             
+            {/* Nút Giới Thiệu Bạn Bè */}
+            <Link
+              href="/referral"
+              className="text-[11px] sm:text-xs bg-gradient-to-r from-amber-500/20 to-rose-500/20 hover:from-amber-500/30 hover:to-rose-500/30 border border-amber-500/40 text-amber-300 font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition shrink-0 shadow-sm"
+              title="Mời bạn bè nhận hoa hồng"
+            >
+              <span>🎁</span>
+              <span className="hidden xs:inline sm:inline">Mời bạn</span>
+            </Link>
+
             {/* Nút thao tác Admin */}
             {isUserAdmin && (
               <div className="flex items-center gap-1">
@@ -215,7 +236,7 @@ export default function Home() {
               <div className="flex items-center gap-1 sm:gap-2">
                 <Link
                   href="/profile"
-                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-1.5 sm:px-2 py-1.5 rounded-lg transition max-w-[70px] sm:max-w-[120px]"
+                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-1.5 sm:px-2 py-1.5 rounded-lg transition max-w-[80px] sm:max-w-[130px]"
                 >
                   <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
                     {avatarChar}
