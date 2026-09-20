@@ -12,6 +12,9 @@ export default function Home() {
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [hotProducts, setHotProducts] = useState<any[]>([]);
+  
+  // State quản lý Modal Hướng dẫn
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   const ADMIN_EMAIL = 'toanzin00001@gmail.com';
 
@@ -21,24 +24,6 @@ export default function Home() {
     { id: '3', platform: 'Lazada', code: 'LAZ30K', title: 'Giảm 30K đơn từ 150K', category: 'Thu thập', expire_time: 'Sắp hết', affiliate_link: '' },
     { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày', affiliate_link: '' },
   ];
-
-  // Hàm tính số tiền hoàn thực nhận
-  const calculateCashbackAmount = (price: any, rate: any) => {
-    const numPrice = Number(price) || 0;
-    if (!rate || numPrice === 0) return 0;
-
-    const rateStr = String(rate).trim();
-    if (rateStr.includes('%')) {
-      const percent = parseFloat(rateStr) || 0;
-      return Math.round((numPrice * percent) / 100);
-    }
-
-    if (rateStr.toLowerCase().includes('k')) {
-      return (parseFloat(rateStr) || 0) * 1000;
-    }
-
-    return Number(rateStr) || 0;
-  };
 
   const loadUserProfile = async (currentUser: any) => {
     try {
@@ -66,11 +51,9 @@ export default function Home() {
 
   const fetchData = async () => {
     try {
-      // 1. Voucher
       const { data: vouData } = await supabase.from('vouchers').select('*').order('created_at', { ascending: false });
       setVouchers(vouData && vouData.length > 0 ? vouData : defaultVouchers);
 
-      // 2. Sản phẩm Hot
       const { data: prodData } = await supabase.from('hot_products').select('*').order('created_at', { ascending: false });
       setHotProducts(prodData || []);
     } catch {
@@ -117,37 +100,23 @@ export default function Home() {
   };
 
   const handleConvert = async () => {
-    if (!inputUrl.trim()) {
-      alert('Vui lòng nhập link sản phẩm Shopee, Lazada hoặc TikTok!');
-      return;
-    }
-
+    if (!inputUrl) return alert('Vui lòng dán link sản phẩm!');
     setLoading(true);
+    setAffiliateLink('');
+
     try {
-      const response = await fetch('/api/convert', {
+      const res = await fetch('/api/convert', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: inputUrl.trim(),
-          userId: user?.id || 'guest',
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalUrl: inputUrl, userId: user ? user.id : 'guest' })
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.affiliateUrl) {
-        setAffiliateLink(data.affiliateUrl);
-      } else {
-        alert(data?.error || data?.message || 'Không thể tạo link hoàn tiền cho sản phẩm này!');
-      }
-    } catch (error) {
-      console.error('Lỗi khi convert link:', error);
-      alert('Có lỗi xảy ra khi kết nối máy chủ hoàn tiền!');
-    } finally {
-      setLoading(false);
+      const data = await res.json();
+      if (data.affiliateUrl) setAffiliateLink(data.affiliateUrl);
+      else alert(data.error || 'Không thể tạo link hoàn tiền!');
+    } catch {
+      alert('Đã xảy ra lỗi khi tạo link!');
     }
+    setLoading(false);
   };
 
   const handleCopyCode = (voucher: any) => {
@@ -267,7 +236,7 @@ export default function Home() {
                 onClick={handleConvert}
                 disabled={loading}
                 type="button"
-                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition disabled:opacity-50"
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-sm px-6 py-3.5 rounded-xl shadow-lg transition"
               >
                 {loading ? 'Đang xử lý...' : 'Lấy Link Hoàn Tiền'}
               </button>
@@ -289,11 +258,23 @@ export default function Home() {
                 </a>
               </div>
             )}
+
+            {/* Nút bấm xem Hướng Dẫn Mua Sắm */}
+            <div className="mt-3.5 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs">
+              <span className="text-slate-400">💡 Mua sắm lần đầu?</span>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(true)}
+                className="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1 transition"
+              >
+                <span>📖 Xem hướng dẫn nhận hoàn tiền 100% (Tránh mất đơn)</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Sản phẩm Hot */}
+      {/* MỤC SẢN PHẨM BÁN CHẠY (HOT DEALS) */}
       {hotProducts.length > 0 && (
         <section className="max-w-6xl mx-auto px-4 pb-12">
           <div className="flex items-center justify-between mb-6">
@@ -306,69 +287,54 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-            {hotProducts.map((p) => {
-              const cashbackAmount = calculateCashbackAmount(p.price, p.cashback_rate);
-
-              return (
-                <a
-                  key={p.id}
-                  href={p.affiliate_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group bg-slate-800/60 border border-slate-700/60 hover:border-rose-500/60 rounded-xl overflow-hidden flex flex-col justify-between transition hover:-translate-y-1 shadow-lg"
-                >
-                  <div>
-                    <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.image_url}
-                        alt={p.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      />
-                      <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
-                        {p.cashback_rate || 'Hoàn tiền'}
-                      </div>
-                      <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
-                        {p.platform || 'Shopee'}
-                      </div>
+            {hotProducts.map((p) => (
+              <a
+                key={p.id}
+                href={p.affiliate_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-slate-800/60 border border-slate-700/60 hover:border-rose-500/60 rounded-xl overflow-hidden flex flex-col justify-between transition hover:-translate-y-1 shadow-lg"
+              >
+                <div>
+                  <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.image_url}
+                      alt={p.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                    />
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                      {p.cashback_rate || 'Hoàn tiền'}
                     </div>
+                    <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
+                      {p.platform || 'Shopee'}
+                    </div>
+                  </div>
 
-                    <div className="p-3 pb-2">
-                      <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition min-h-[32px]">
-                        {p.title}
-                      </p>
-                      
-                      <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-sm font-black text-rose-400">
-                          {Number(p.price).toLocaleString()}đ
+                  <div className="p-3">
+                    <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition">
+                      {p.title}
+                    </p>
+                    <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-sm font-black text-rose-400">
+                        {Number(p.price).toLocaleString()}đ
+                      </span>
+                      {p.original_price > p.price && (
+                        <span className="text-[10px] text-slate-500 line-through">
+                          {Number(p.original_price).toLocaleString()}đ
                         </span>
-                        {p.original_price > p.price && (
-                          <span className="text-[10px] text-slate-500 line-through">
-                            {Number(p.original_price).toLocaleString()}đ
-                          </span>
-                        )}
-                      </div>
-
-                      {/* KHỐI HIỂN THỊ SỐ TIỀN THỰC NHẬN VỀ VÍ */}
-                      {cashbackAmount > 0 && (
-                        <div className="mt-2 py-1 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                          <span className="text-[10px] text-emerald-300 font-medium">Nhận lại:</span>
-                          <span className="text-[11px] font-black text-emerald-400">
-                            +{cashbackAmount.toLocaleString()}đ
-                          </span>
-                        </div>
                       )}
                     </div>
                   </div>
+                </div>
 
-                  <div className="p-3 pt-1">
-                    <div className="w-full text-center bg-slate-700/70 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-bold text-[11px] py-1.5 rounded-lg transition">
-                      Mua Hoàn Tiền ➔
-                    </div>
+                <div className="p-3 pt-0">
+                  <div className="w-full text-center bg-slate-700/70 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-bold text-[11px] py-1.5 rounded-lg transition">
+                    Mua Hoàn Tiền ➔
                   </div>
-                </a>
-              );
-            })}
+                </div>
+              </a>
+            ))}
           </div>
         </section>
       )}
@@ -421,6 +387,84 @@ export default function Home() {
           })}
         </div>
       </section>
+
+      {/* ================= MODAL HƯỚNG DẪN MUA SẮM 3 BƯỚC ================= */}
+      {showGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 sm:p-7 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-base sm:text-lg text-white flex items-center gap-2">
+                📖 Quy Trình Hoàn Tiền 100% Thành Công
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGuideModal(false)}
+                className="text-slate-400 hover:text-white text-xl font-bold px-2 py-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs sm:text-sm">
+              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  1
+                </span>
+                <div>
+                  <h4 className="font-bold text-white mb-0.5">Tìm sản phẩm & Sao chép link</h4>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Vào ứng dụng Shopee/Lazada, tìm món đồ bạn muốn mua rồi bấm nút <strong>Chia sẻ ➔ Sao chép liên kết</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  2
+                </span>
+                <div>
+                  <h4 className="font-bold text-white mb-0.5">Dán link vào trang & Lấy link hoàn tiền</h4>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Dán link vào ô nhập phía trên, bấm <strong>Lấy Link Hoàn Tiền</strong>, sau đó bấm <strong>Đi Tới Mua Hàng</strong> để hệ thống gắn mã cashback của bạn.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                  3
+                </span>
+                <div>
+                  <h4 className="font-bold text-white mb-0.5">Thanh toán đơn hàng ngay lập tức</h4>
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Tiến hành đặt hàng luôn trên ứng dụng. Đơn hàng sẽ được ghi nhận vào mục <strong>Trang cá nhân ➔ Đơn hàng</strong> trong vòng 1-2 tiếng!
+                  </p>
+                </div>
+              </div>
+
+              {/* Cảnh báo quan trọng */}
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  ⚠️ Lưu ý quan trọng để không bị mất hoàn tiền:
+                </p>
+                <ul className="list-disc list-inside text-amber-200/80 space-y-1 text-[11px] leading-relaxed">
+                  <li>Không bấm qua link của người khác hoặc group săn sale sau khi đã lấy link.</li>
+                  <li>Phải đặt hàng và thanh toán trên cùng một thiết bị vừa bấm link.</li>
+                  <li>Không thoát tài khoản sàn hoặc đổi tài khoản khác khi đang mua.</li>
+                </ul>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowGuideModal(false)}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs transition shadow-lg shadow-rose-600/30"
+            >
+              Tôi Đã Hiểu & Bắt Đầu Mua Sắm! 🚀
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
