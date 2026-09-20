@@ -269,6 +269,11 @@ export default function AdminPage() {
     return found?.email || String(userId || '').slice(0, 8);
   };
 
+  const getUserCode = (userId) => {
+    const found = users.find((u) => String(u.id) === String(userId));
+    return found?.user_code || `UID${String(userId || '').substring(0, 6).toUpperCase()}`;
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Vừa xong';
     try {
@@ -285,7 +290,8 @@ export default function AdminPage() {
 
   const filteredUsers = users.filter((u) =>
     (u.email || '').toLowerCase().includes(searchUser.toLowerCase()) ||
-    (u.full_name || '').toLowerCase().includes(searchUser.toLowerCase())
+    (u.full_name || '').toLowerCase().includes(searchUser.toLowerCase()) ||
+    (u.user_code || '').toLowerCase().includes(searchUser.toLowerCase())
   );
 
   return (
@@ -394,7 +400,8 @@ export default function AdminPage() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-900/80 border-b border-slate-700 text-slate-400 uppercase text-[11px]">
-                    <th className="py-3 px-4">User</th>
+                    <th className="py-3 px-4">USER ID</th>
+                    <th className="py-3 px-4">Email</th>
                     <th className="py-3 px-4">Số Tiền</th>
                     <th className="py-3 px-4">Ngân Hàng</th>
                     <th className="py-3 px-4">Thời Gian</th>
@@ -405,11 +412,12 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-slate-700/60">
                   {withdrawals.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-slate-500">Chưa có yêu cầu rút tiền nào</td>
+                      <td colSpan={7} className="py-6 text-center text-slate-500">Chưa có yêu cầu rút tiền nào</td>
                     </tr>
                   ) : (
                     withdrawals.map((w) => (
                       <tr key={w.id} className="hover:bg-slate-700/20">
+                        <td className="py-3 px-4 font-mono font-bold text-amber-400">{getUserCode(w.user_id)}</td>
                         <td className="py-3 px-4 font-semibold text-white">{getUserEmail(w.user_id)}</td>
                         <td className="py-3 px-4 font-bold text-rose-400">{Number(w.amount || 0).toLocaleString()}đ</td>
                         <td className="py-3 px-4 text-slate-300">{w.bank_name} - {w.bank_account || w.account_number} ({w.account_holder || w.account_name})</td>
@@ -655,8 +663,7 @@ export default function AdminPage() {
                       value={newVoucher.code}
                       onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase outline-none focus:border-rose-500"
-                    >
-                    </input>
+                    />
                   </div>
                   <div>
                     <label className="text-[11px] text-slate-400 block mb-1">Tiêu Đề / Giảm Giá</label>
@@ -741,27 +748,58 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB THÀNH VIÊN */}
+        {/* TAB DANH SÁCH THÀNH VIÊN */}
         {activeTab === 'users' && (
           <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
-            <h2 className="text-base font-bold text-white mb-4">Danh Sách Thành Viên</h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+              <h2 className="text-base font-bold text-white">Danh Sách Thành Viên ({filteredUsers.length})</h2>
+              <input
+                type="text"
+                placeholder="Tìm kiếm Email hoặc User ID..."
+                value={searchUser}
+                onChange={(e) => setSearchUser(e.target.value)}
+                className="bg-slate-900 border border-slate-700 text-xs px-3 py-1.5 rounded-xl text-white outline-none focus:border-rose-500 w-full sm:w-64"
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-700 text-slate-400 uppercase text-[10px]">
+                    <th className="py-2.5 px-3">USER ID</th>
                     <th className="py-2.5 px-3">Email</th>
+                    <th className="py-2.5 px-3">Họ Tên</th>
                     <th className="py-2.5 px-3">Số Dư</th>
                     <th className="py-2.5 px-3">Ngân Hàng</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/60">
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-700/20">
-                      <td className="py-2.5 px-3 text-white font-semibold">{u.email}</td>
-                      <td className="py-2.5 px-3 text-emerald-400 font-bold">{Number(u.balance || 0).toLocaleString()}đ</td>
-                      <td className="py-2.5 px-3 text-slate-300">{u.bank_name ? `${u.bank_name} - ${u.bank_account}` : 'Chưa liên kết'}</td>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-500">Không tìm thấy thành viên nào</td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-700/20">
+                        <td className="py-2.5 px-3 font-mono font-bold text-amber-400">
+                          {u.user_code || `UID${u.id.substring(0, 6).toUpperCase()}`}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-200 font-medium">{u.email}</td>
+                        <td className="py-2.5 px-3 text-slate-300">{u.full_name || 'Chưa đặt'}</td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-bold">
+                          {Number(u.balance || 0).toLocaleString()}đ
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-400">
+                          {u.bank_name ? (
+                            <span>
+                              {u.bank_name} - <strong className="text-slate-300 font-mono">{u.bank_account || u.account_number}</strong>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 italic">Chưa liên kết</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -772,26 +810,36 @@ export default function AdminPage() {
         {activeTab === 'orders' && (
           <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
             <h2 className="text-base font-bold text-white mb-4">Đơn Hàng Ghi Nhận</h2>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-700 text-slate-400 uppercase text-[10px]">
-                  <th className="py-2.5 px-3">Mã Đơn</th>
-                  <th className="py-2.5 px-3">Sàn</th>
-                  <th className="py-2.5 px-3">User</th>
-                  <th className="py-2.5 px-3">Tiền Hoàn</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/60">
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-700/20">
-                    <td className="py-2.5 px-3 font-mono text-white">{o.order_id}</td>
-                    <td className="py-2.5 px-3">{o.platform}</td>
-                    <td className="py-2.5 px-3 text-slate-300">{getUserEmail(o.user_id)}</td>
-                    <td className="py-2.5 px-3 text-emerald-400 font-bold">+{Number(o.cashback_amount || 0).toLocaleString()}đ</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-700 text-slate-400 uppercase text-[10px]">
+                    <th className="py-2.5 px-3">USER ID</th>
+                    <th className="py-2.5 px-3">Mã Đơn</th>
+                    <th className="py-2.5 px-3">Sàn</th>
+                    <th className="py-2.5 px-3">User Email</th>
+                    <th className="py-2.5 px-3">Tiền Hoàn</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-700/60">
+                  {orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-500">Chưa có đơn hàng nào</td>
+                    </tr>
+                  ) : (
+                    orders.map((o) => (
+                      <tr key={o.id} className="hover:bg-slate-700/20">
+                        <td className="py-2.5 px-3 font-mono font-bold text-amber-400">{getUserCode(o.user_id)}</td>
+                        <td className="py-2.5 px-3 font-mono text-white">{o.order_id}</td>
+                        <td className="py-2.5 px-3">{o.platform}</td>
+                        <td className="py-2.5 px-3 text-slate-300">{getUserEmail(o.user_id)}</td>
+                        <td className="py-2.5 px-3 text-emerald-400 font-bold">+{Number(o.cashback_amount || 0).toLocaleString()}đ</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -920,7 +968,6 @@ export default function AdminPage() {
                   🎟️ Chỉnh Sửa Voucher #{editingVoucher.id}
                 </h3>
                 <button
-                  type="button"
                   onClick={() => setEditingVoucher(null)}
                   className="text-slate-400 hover:text-white text-lg font-bold"
                 >
