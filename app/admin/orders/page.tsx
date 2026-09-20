@@ -57,6 +57,40 @@ export default function AdminOrdersPage() {
     checkAuth();
   }, [router]);
 
+  // HÀM CHIA HOA HỒNG CHO NGƯỜI GIỚI THIỆU (10% TIỀN HOÀN ĐƠN)
+  const processReferralReward = async (buyerProfile: any, cashbackAmount: number) => {
+    try {
+      if (!buyerProfile?.referred_by || cashbackAmount <= 0) return 0;
+
+      const referrerCode = String(buyerProfile.referred_by).trim().toUpperCase();
+
+      // Tìm người giới thiệu theo user_code hoặc id
+      const { data: referrer } = await supabase
+        .from('profiles')
+        .select('id, balance, user_code')
+        .or(`user_code.eq.${referrerCode},id.eq.${referrerCode}`)
+        .maybeSingle();
+
+      if (referrer) {
+        const commissionRate = 0.1; // 10% hoa hồng giới thiệu
+        const reward = Math.round(cashbackAmount * commissionRate);
+
+        if (reward > 0) {
+          const newRefBalance = Number(referrer.balance || 0) + reward;
+          await supabase
+            .from('profiles')
+            .update({ balance: newRefBalance })
+            .eq('id', referrer.id);
+
+          return reward;
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi chia hoa hồng giới thiệu:', err);
+    }
+    return 0;
+  };
+
   // Xử lý cộng tiền và lưu 1 đơn lẻ
   const handleAddSingleOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,17 +117,25 @@ export default function AdminOrdersPage() {
 
       if (orderError) throw orderError;
 
-      // 2. Lấy số dư hiện tại và cộng tiền vào ví User
+      // 2. Lấy số dư hiện tại và cộng tiền vào ví User mua hàng
       const { data: profile } = await supabase
         .from('profiles')
-        .select('balance')
+        .select('id, balance, referred_by')
         .eq('id', singleOrder.user_id)
         .single();
 
       const newBalance = Number(profile?.balance || 0) + amount;
       await supabase.from('profiles').update({ balance: newBalance }).eq('id', singleOrder.user_id);
 
-      alert(`Đã duyệt đơn và cộng ${amount.toLocaleString()}đ vào ví khách!`);
+      // 3. Tự động chia 10% hoa hồng cho người giới thiệu nếu có
+      const reward = await processReferralReward(profile, amount);
+
+      let msg = `Đã duyệt đơn và cộng ${amount.toLocaleString()}đ vào ví khách!`;
+      if (reward > 0) {
+        msg += `\nĐồng thời tự động cộng ${reward.toLocaleString()}đ hoa hồng giới thiệu cho ${profile.referred_by}!`;
+      }
+      alert(msg);
+
       setSingleOrder({
         order_id: '',
         platform: 'Shopee',
@@ -109,7 +151,7 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Xử lý đối soát hàng loạt (Paste từ Excel: Cột 1 = Mã đơn, Cột 2 = User ID, Cột 3 = Tiền hoàn)
+  // Xử lý đối soát hàng loạt (Paste từ Excel: Cột 1 = Mã đơn, Cột 2 = User ID hoặc Mã UID, Cột 3 = Tiền hoàn)
   const handleProcessBatch = async () => {
     if (!batchText.trim()) {
       alert('Vui lòng dán dữ liệu copy từ file Excel/Sheets!');
@@ -119,35 +161,46 @@ export default function AdminOrdersPage() {
     setSubmitting(true);
     const lines = batchText.trim().split('\n');
     let successCount = 0;
+    let totalCommissionSent = 0;
 
     for (const line of lines) {
-      // Tách theo tab hoặc dấu phẩy
       const parts = line.split(/[\t,]/).map((p) => p.trim());
       if (parts.length >= 3) {
         const orderId = parts[0];
-        const userId = parts[1];
+        const userIdentifier = parts[1]; // Có thể là UUID hoặc UID123456
         const cashback = Number(parts[2].replace(/[^\d]/g, ''));
 
-        if (orderId && userId && !isNaN(cashback) && cashback > 0) {
+        if (orderId && userIdentifier && !isNaN(cashback) && cashback > 0) {
           try {
-            // Thêm đơn
-            await supabase.from('cashback_orders').insert([
-              {
-                order_id: orderId,
-                platform: 'Shopee',
-                user_id: userId,
-                cashback_amount: cashback,
-                status: 'completed',
-              },
-            ]);
+            // Tìm user tương ứng theo ID hoặc theo mã user_code
+            const { data: buyer } = await supabase
+              .from('profiles')
+              .select('id, balance, referred_by')
+              .or(`id.eq.${userIdentifier},user_code.eq.${userIdentifier.toUpperCase()}`)
+              .maybeSingle();
 
-            // Cộng tiền vào user
-            const { data: p } = await supabase.from('profiles').select('balance').eq('id', userId).maybeSingle();
-            if (p) {
+            if (buyer) {
+              // Thêm đơn hàng
+              await supabase.from('cashback_orders').insert([
+                {
+                  order_id: orderId,
+                  platform: 'Shopee',
+                  user_id: buyer.id,
+                  cashback_amount: cashback,
+                  status: 'completed',
+                },
+              ]);
+
+              // Cộng tiền hoàn cho người mua
               await supabase
                 .from('profiles')
-                .update({ balance: Number(p.balance || 0) + cashback })
-                .eq('id', userId);
+                .update({ balance: Number(buyer.balance || 0) + cashback })
+                .eq('id', buyer.id);
+
+              // Chia hoa hồng giới thiệu tự động
+              const reward = await processReferralReward(buyer, cashback);
+              if (reward > 0) totalCommissionSent += reward;
+
               successCount++;
             }
           } catch (err) {
@@ -157,15 +210,26 @@ export default function AdminOrdersPage() {
       }
     }
 
-    alert(`Đã xử lý đối soát và cộng tiền thành công cho ${successCount} đơn hàng!`);
+    let summary = `Đã xử lý đối soát và cộng tiền thành công cho ${successCount} đơn hàng!`;
+    if (totalCommissionSent > 0) {
+      summary += `\nTổng hoa hồng tự động chi trả cho người giới thiệu: ${totalCommissionSent.toLocaleString()}đ`;
+    }
+    alert(summary);
+
     setBatchText('');
     setSubmitting(false);
     fetchData();
   };
 
-  const getUserEmail = (userId: string) => {
+  const getUserDisplay = (userId: string) => {
     const found = users.find((u) => String(u.id) === String(userId));
-    return found ? `${found.email} (${String(userId).slice(0, 6)})` : userId;
+    if (!found) return userId;
+    const uid = found.user_code || `UID${String(found.id).slice(0, 6).toUpperCase()}`;
+    return {
+      email: found.email,
+      uid: uid,
+      referrer: found.referred_by || null,
+    };
   };
 
   return (
@@ -200,7 +264,13 @@ export default function AdminOrdersPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form thêm 1 đơn lẻ */}
           <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
-            <h2 className="text-base font-bold text-white mb-3">➕ Duyệt & Cộng Tiền Đơn Lẻ</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-white">➕ Duyệt & Cộng Tiền Đơn Lẻ</h2>
+              <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-md">
+                Tự chia 10% hoa hồng mời
+              </span>
+            </div>
+
             <form onSubmit={handleAddSingleOrder} className="space-y-3 text-xs">
               <div>
                 <label className="text-slate-400 block mb-1">Mã Đơn Hàng Shopee / MasOffer</label>
@@ -236,11 +306,14 @@ export default function AdminOrdersPage() {
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-amber-500"
                   >
                     <option value="">-- Chọn User --</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.email} (Ví: {Number(u.balance || 0).toLocaleString()}đ)
-                      </option>
-                    ))}
+                    {users.map((u) => {
+                      const code = u.user_code || `UID${String(u.id).slice(0, 6).toUpperCase()}`;
+                      return (
+                        <option key={u.id} value={u.id}>
+                          [{code}] {u.email} (Ví: {Number(u.balance || 0).toLocaleString()}đ)
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -285,13 +358,13 @@ export default function AdminOrdersPage() {
               <h2 className="text-base font-bold text-white mb-2">📋 Đối Soát Hàng Loạt Từ Excel</h2>
               <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
                 Copy 3 cột từ Excel/Google Sheets theo thứ tự: <br />
-                <span className="text-amber-400 font-mono font-bold">Mã Đơn [Tab] User ID (sub_id1) [Tab] Tiền Hoàn</span>
+                <span className="text-amber-400 font-mono font-bold">Mã Đơn [Tab] User ID / Mã UID [Tab] Tiền Hoàn</span>
               </p>
               <textarea
                 rows={6}
                 value={batchText}
                 onChange={(e) => setBatchText(e.target.value)}
-                placeholder={`240920A1\t34eee8e4-f2b4-4c13-864a-530cca6794e6\t15000\n240920B2\t34eee8e4-f2b4-4c13-864a-530cca6794e6\t25000`}
+                placeholder={`240920A1\tUIDA1B2C3\t15000\n240920B2\t34eee8e4-f2b4-4c13-864a-530cca6794e6\t25000`}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono outline-none focus:border-amber-500 resize-none"
               />
             </div>
@@ -314,7 +387,9 @@ export default function AdminOrdersPage() {
                 <tr className="bg-slate-900/80 border-b border-slate-700 text-slate-400 uppercase text-[11px]">
                   <th className="py-3 px-4">Mã Đơn</th>
                   <th className="py-3 px-4">Sàn</th>
-                  <th className="py-3 px-4">Khách Hàng (User)</th>
+                  <th className="py-3 px-4">USER ID</th>
+                  <th className="py-3 px-4">Email Khách</th>
+                  <th className="py-3 px-4">Người Mời (Ref)</th>
                   <th className="py-3 px-4">Tiền Hoàn</th>
                   <th className="py-3 px-4 text-center">Trạng Thái</th>
                 </tr>
@@ -322,22 +397,35 @@ export default function AdminOrdersPage() {
               <tbody className="divide-y divide-slate-700/60">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-500">Chưa có đơn hàng nào được ghi nhận</td>
+                    <td colSpan={7} className="py-6 text-center text-slate-500">Chưa có đơn hàng nào được ghi nhận</td>
                   </tr>
                 ) : (
-                  orders.map((o) => (
-                    <tr key={o.id} className="hover:bg-slate-700/20">
-                      <td className="py-3 px-4 font-mono font-bold text-white">{o.order_id}</td>
-                      <td className="py-3 px-4 text-slate-300">{o.platform}</td>
-                      <td className="py-3 px-4 text-slate-300">{getUserEmail(o.user_id)}</td>
-                      <td className="py-3 px-4 font-bold text-emerald-400">+{Number(o.cashback_amount || 0).toLocaleString()}đ</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10">
-                          Thành công
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  orders.map((o) => {
+                    const uInfo = getUserDisplay(o.user_id) as any;
+                    return (
+                      <tr key={o.id} className="hover:bg-slate-700/20">
+                        <td className="py-3 px-4 font-mono font-bold text-white">{o.order_id}</td>
+                        <td className="py-3 px-4 text-slate-300">{o.platform}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-amber-400">{uInfo.uid || o.user_id}</td>
+                        <td className="py-3 px-4 text-slate-300">{uInfo.email || o.user_id}</td>
+                        <td className="py-3 px-4">
+                          {uInfo.referrer ? (
+                            <span className="font-mono text-[11px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded">
+                              {uInfo.referrer} (+10%)
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 italic">Không có</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-emerald-400">+{Number(o.cashback_amount || 0).toLocaleString()}đ</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10">
+                            Thành công
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
