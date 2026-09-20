@@ -1,9 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
 export default function Home() {
+  const router = useRouter();
+
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [inputUrl, setInputUrl] = useState('');
@@ -114,10 +117,19 @@ export default function Home() {
   };
 
   const handleConvert = async () => {
+    // 1. Kiểm tra bắt buộc đăng nhập
+    if (!user) {
+      alert('Vui lòng đăng nhập tài khoản để nhận tiền hoàn!');
+      router.push('/login');
+      return;
+    }
+
+    // 2. Kiểm tra link đầu vào
     if (!inputUrl.trim()) {
       setErrorMessage('Vui lòng dán link sản phẩm (Shopee, Lazada, TikTok)!');
       return;
     }
+
     setLoading(true);
     setAffiliateLink('');
     setErrorMessage('');
@@ -126,7 +138,7 @@ export default function Home() {
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalUrl: inputUrl.trim(), userId: user ? user.id : 'guest' })
+        body: JSON.stringify({ originalUrl: inputUrl.trim(), userId: user.id })
       });
       const data = await res.json();
       if (data.affiliateUrl) {
@@ -156,7 +168,7 @@ export default function Home() {
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
       
-      {/* HEADER TỐI ƯU RESPONSIVE KHÔNG TRÀN MÉP */}
+      {/* HEADER TỐI ƯU RESPONSIVE */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 w-full max-w-full">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           
@@ -284,7 +296,7 @@ export default function Home() {
                 onClick={handleConvert}
                 disabled={loading}
                 type="button"
-                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-xs sm:text-sm px-6 py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                className="w-full sm:w-auto shrink-0 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 text-white font-bold text-xs sm:text-sm px-6 py-3.5 rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <>
