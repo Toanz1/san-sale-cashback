@@ -442,7 +442,7 @@ export default function Home() {
                 <div>
                   <h4 className="font-bold text-white mb-0.5">Tìm sản phẩm & Sao chép link</h4>
                   <p className="text-slate-400 text-xs leading-relaxed">
-                    Vào ứng dụng Shopee/Lazada, chọn món đồ cần mua rồi bấm <strong>Chia sẻ ➔ Sao chép liên kết</strong>.
+                    Vào ứng dụng Shopee, Lazada & TikTok Shop chọn món đồ cần mua rồi bấm <strong>Chia sẻ ➔ Sao chép liên kết</strong>.
                   </p>
                 </div>
               </div>
