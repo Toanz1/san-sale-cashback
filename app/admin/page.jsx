@@ -17,6 +17,9 @@ export default function AdminPage() {
   const [vouchers, setVouchers] = useState([]);
   const [products, setProducts] = useState([]);
 
+  // State lưu sản phẩm đang chỉnh sửa
+  const [editingProduct, setEditingProduct] = useState(null);
+
   // Trạng thái quét tự động qua ScraperAPI
   const [isScraping, setIsScraping] = useState(false);
 
@@ -194,6 +197,38 @@ export default function AdminPage() {
     fetchAllData();
   };
 
+  // Mở modal sửa sản phẩm
+  const handleOpenEdit = (product) => {
+    setEditingProduct({ ...product });
+  };
+
+  // Lưu thay đổi sản phẩm lên Supabase
+  const handleSaveEditProduct = async (e) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const { error } = await supabase
+      .from('hot_products')
+      .update({
+        title: editingProduct.title,
+        price: Number(editingProduct.price) || 0,
+        original_price: Number(editingProduct.original_price) || 0,
+        cashback_rate: editingProduct.cashback_rate,
+        image_url: editingProduct.image_url.trim(),
+        affiliate_link: editingProduct.affiliate_link.trim(),
+        platform: editingProduct.platform
+      })
+      .eq('id', editingProduct.id);
+
+    if (error) {
+      alert('Lỗi cập nhật sản phẩm: ' + error.message);
+    } else {
+      alert('Cập nhật sản phẩm thành công!');
+      setEditingProduct(null);
+      fetchAllData();
+    }
+  };
+
   const getUserEmail = (userId) => {
     const found = users.find((u) => String(u.id) === String(userId));
     return found?.email || String(userId || '').slice(0, 8);
@@ -361,7 +396,7 @@ export default function AdminPage() {
               <h2 className="text-base font-bold text-white mb-4">Thêm Sản Phẩm Bán Chạy Shopee / Lazada</h2>
               
               <form onSubmit={handleAddProduct} className="space-y-4">
-                {/* Dán link và nút Quét tự động đưa lên đầu */}
+                {/* Dán link và nút Quét tự động */}
                 <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3.5">
                   <label className="text-xs font-bold text-slate-300 block mb-1.5">
                     1. Link Tiếp Thị Liên Kết (Shopee Aff / Link sản phẩm)
@@ -462,7 +497,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Khối xem trước ảnh và tên sau khi quét thành công */}
+                {/* Khối xem trước */}
                 {newProduct.image_url && (
                   <div className="flex items-center gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-700/60">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -502,13 +537,26 @@ export default function AdminPage() {
                       <p className="text-xs font-bold text-white line-clamp-2">{p.title}</p>
                       <p className="text-xs text-rose-400 font-black mt-1">{Number(p.price).toLocaleString()}đ</p>
                     </div>
+                    
+                    {/* HÀNG NÚT THAO TÁC: MỞ LINK, SỬA, XÓA */}
                     <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <a href={p.affiliate_link} target="_blank" rel="noopener noreferrer" className="text-[11px] text-emerald-400 hover:underline">
-                        Mở thử link ➔
+                        Mở link ➔
                       </a>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="text-[11px] text-rose-400 hover:text-white bg-rose-500/20 px-2 py-0.5 rounded">
-                        Xóa
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => handleOpenEdit(p)} 
+                          className="text-[11px] text-amber-400 hover:text-white bg-amber-500/20 hover:bg-amber-500 px-2 py-0.5 rounded transition font-medium"
+                        >
+                          Sửa
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(p.id)} 
+                          className="text-[11px] text-rose-400 hover:text-white bg-rose-500/20 hover:bg-rose-500 px-2 py-0.5 rounded transition font-medium"
+                        >
+                          Xóa
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -670,6 +718,122 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ================= MODAL POPUP CHỈNH SỬA SẢN PHẨM ================= */}
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                  ✏️ Chỉnh Sửa Sản Phẩm #{editingProduct.id}
+                </h3>
+                <button
+                  onClick={() => setEditingProduct(null)}
+                  className="text-slate-400 hover:text-white text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditProduct} className="space-y-3 text-xs">
+                <div>
+                  <label className="text-slate-400 block mb-1">Tên sản phẩm</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingProduct.title}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, title: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Giá khuyến mãi (VNĐ)</label>
+                    <input
+                      type="number"
+                      required
+                      value={editingProduct.price}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold text-rose-400 outline-none focus:border-rose-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Giá gốc (nếu có)</label>
+                    <input
+                      type="number"
+                      value={editingProduct.original_price || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, original_price: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-400 block mb-1">% Hoàn tiền hiển thị</label>
+                    <input
+                      type="text"
+                      value={editingProduct.cashback_rate}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, cashback_rate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Sàn</label>
+                    <select
+                      value={editingProduct.platform}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, platform: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none"
+                    >
+                      <option value="Shopee">Shopee</option>
+                      <option value="Lazada">Lazada</option>
+                      <option value="TikTok">TikTok Shop</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Link ảnh sản phẩm (URL)</label>
+                  <input
+                    type="url"
+                    required
+                    value={editingProduct.image_url}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, image_url: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Link Tiếp thị liên kết (Affiliate)</label>
+                  <input
+                    type="url"
+                    required
+                    value={editingProduct.affiliate_link}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, affiliate_link: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition shadow-lg shadow-rose-600/30"
+                  >
+                    Lưu thay đổi 💾
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </main>
