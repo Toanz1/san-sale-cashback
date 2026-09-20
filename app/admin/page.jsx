@@ -94,7 +94,7 @@ export default function AdminPage() {
       });
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setNewProduct((prev) => ({
           ...prev,
           title: data.name || prev.title,
@@ -103,7 +103,7 @@ export default function AdminPage() {
         }));
         alert('Đã lấy thành công Tên, Ảnh và Giá sản phẩm!');
       } else {
-        alert(data.error || 'Không thể quét dữ liệu tự động, vui lòng nhập tay.');
+        alert(data.error || 'Không thể lấy dữ liệu tự động. Hãy thử dán link chi tiết của sản phẩm trên trình duyệt!');
       }
     } catch (err) {
       alert('Lỗi kết nối tới máy chủ quét dữ liệu!');
