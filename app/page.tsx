@@ -22,6 +22,24 @@ export default function Home() {
     { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày', affiliate_link: '' },
   ];
 
+  // Hàm tính số tiền hoàn thực nhận
+  const calculateCashbackAmount = (price: any, rate: any) => {
+    const numPrice = Number(price) || 0;
+    if (!rate || numPrice === 0) return 0;
+
+    const rateStr = String(rate).trim();
+    if (rateStr.includes('%')) {
+      const percent = parseFloat(rateStr) || 0;
+      return Math.round((numPrice * percent) / 100);
+    }
+
+    if (rateStr.toLowerCase().includes('k')) {
+      return (parseFloat(rateStr) || 0) * 1000;
+    }
+
+    return Number(rateStr) || 0;
+  };
+
   const loadUserProfile = async (currentUser: any) => {
     try {
       const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
@@ -98,8 +116,6 @@ export default function Home() {
     }
   };
 
-  // Hàm chuyển đổi link gọi sang Backend Render
-  // Hàm chuyển đổi link gọi thẳng vào API nội bộ Next.js
   const handleConvert = async () => {
     if (!inputUrl.trim()) {
       alert('Vui lòng nhập link sản phẩm Shopee, Lazada hoặc TikTok!');
@@ -290,54 +306,69 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-            {hotProducts.map((p) => (
-              <a
-                key={p.id}
-                href={p.affiliate_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group bg-slate-800/60 border border-slate-700/60 hover:border-rose-500/60 rounded-xl overflow-hidden flex flex-col justify-between transition hover:-translate-y-1 shadow-lg"
-              >
-                <div>
-                  <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.image_url}
-                      alt={p.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    />
-                    <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
-                      {p.cashback_rate || 'Hoàn tiền'}
-                    </div>
-                    <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
-                      {p.platform || 'Shopee'}
-                    </div>
-                  </div>
+            {hotProducts.map((p) => {
+              const cashbackAmount = calculateCashbackAmount(p.price, p.cashback_rate);
 
-                  <div className="p-3">
-                    <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition">
-                      {p.title}
-                    </p>
-                    <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
-                      <span className="text-sm font-black text-rose-400">
-                        {Number(p.price).toLocaleString()}đ
-                      </span>
-                      {p.original_price > p.price && (
-                        <span className="text-[10px] text-slate-500 line-through">
-                          {Number(p.original_price).toLocaleString()}đ
+              return (
+                <a
+                  key={p.id}
+                  href={p.affiliate_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group bg-slate-800/60 border border-slate-700/60 hover:border-rose-500/60 rounded-xl overflow-hidden flex flex-col justify-between transition hover:-translate-y-1 shadow-lg"
+                >
+                  <div>
+                    <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.image_url}
+                        alt={p.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
+                        {p.cashback_rate || 'Hoàn tiền'}
+                      </div>
+                      <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
+                        {p.platform || 'Shopee'}
+                      </div>
+                    </div>
+
+                    <div className="p-3 pb-2">
+                      <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition min-h-[32px]">
+                        {p.title}
+                      </p>
+                      
+                      <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-sm font-black text-rose-400">
+                          {Number(p.price).toLocaleString()}đ
                         </span>
+                        {p.original_price > p.price && (
+                          <span className="text-[10px] text-slate-500 line-through">
+                            {Number(p.original_price).toLocaleString()}đ
+                          </span>
+                        )}
+                      </div>
+
+                      {/* KHỐI HIỂN THỊ SỐ TIỀN THỰC NHẬN VỀ VÍ */}
+                      {cashbackAmount > 0 && (
+                        <div className="mt-2 py-1 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                          <span className="text-[10px] text-emerald-300 font-medium">Nhận lại:</span>
+                          <span className="text-[11px] font-black text-emerald-400">
+                            +{cashbackAmount.toLocaleString()}đ
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
-                </div>
 
-                <div className="p-3 pt-0">
-                  <div className="w-full text-center bg-slate-700/70 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-bold text-[11px] py-1.5 rounded-lg transition">
-                    Mua Hoàn Tiền ➔
+                  <div className="p-3 pt-1">
+                    <div className="w-full text-center bg-slate-700/70 group-hover:bg-rose-600 text-slate-200 group-hover:text-white font-bold text-[11px] py-1.5 rounded-lg transition">
+                      Mua Hoàn Tiền ➔
+                    </div>
                   </div>
-                </div>
-              </a>
-            ))}
+                </a>
+              );
+            })}
           </div>
         </section>
       )}
