@@ -34,20 +34,6 @@ export default function AdminPage() {
     expire_time: 'Hôm nay',
     affiliate_link: ''
   });
-  <div className="flex items-center gap-2">
-  <Link
-    href="/admin/orders"
-    className="text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
-  >
-    <span>📊</span> Duyệt Shopee
-  </Link>
-  <Link
-    href="/"
-    className="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl transition"
-  >
-    ← Về Trang Chủ
-  </Link>
-</div>
 
   // Form sản phẩm hot
   const [newProduct, setNewProduct] = useState({
@@ -153,6 +139,13 @@ export default function AdminPage() {
     fetchAllData();
   };
 
+  const handleResetWithdrawal = async (withdraw) => {
+    if (!confirm('Chuyển lại trạng thái thành Chờ duyệt?')) return;
+    const { error } = await supabase.from('withdrawals').update({ status: 'pending' }).eq('id', withdraw.id);
+    if (error) alert('Lỗi: ' + error.message);
+    else { alert('Đã chuyển về chờ duyệt!'); fetchAllData(); }
+  };
+
   // ================= QUẢN LÝ VOUCHER =================
   const handleAddVoucher = async (e) => {
     e.preventDefault();
@@ -176,12 +169,10 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  // Mở modal sửa voucher
   const handleOpenEditVoucher = (voucher) => {
     setEditingVoucher({ ...voucher });
   };
 
-  // Lưu voucher đã sửa
   const handleSaveEditVoucher = async (e) => {
     e.preventDefault();
     if (!editingVoucher) return;
@@ -243,12 +234,10 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  // Mở modal sửa sản phẩm
   const handleOpenEdit = (product) => {
     setEditingProduct({ ...product });
   };
 
-  // Lưu thay đổi sản phẩm lên Supabase
   const handleSaveEditProduct = async (e) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -310,12 +299,20 @@ export default function AdminPage() {
             </span>
             <h1 className="font-extrabold text-base sm:text-lg text-white">Quản Trị Hệ Thống</h1>
           </div>
-          <Link
-            href="/"
-            className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 px-3.5 py-2 rounded-xl border border-slate-700 transition"
-          >
-            ← Về Trang Chủ
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/orders"
+              className="text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
+            >
+              <span>📊</span> Duyệt Shopee
+            </Link>
+            <Link
+              href="/"
+              className="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl transition border border-slate-700"
+            >
+              ← Về Trang Chủ
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -406,29 +403,52 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/60">
-                  {withdrawals.map((w) => (
-                    <tr key={w.id} className="hover:bg-slate-700/20">
-                      <td className="py-3 px-4 font-semibold text-white">{getUserEmail(w.user_id)}</td>
-                      <td className="py-3 px-4 font-bold text-rose-400">{Number(w.amount || 0).toLocaleString()}đ</td>
-                      <td className="py-3 px-4 text-slate-300">{w.bank_name} - {w.bank_account || w.account_number} ({w.account_holder || w.account_name})</td>
-                      <td className="py-3 px-4 text-slate-400">{formatDate(w.created_at)}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          w.status === 'completed' ? 'text-emerald-400 bg-emerald-500/10' : w.status === 'pending' ? 'text-amber-400 bg-amber-500/10' : 'text-rose-400 bg-rose-500/10'
-                        }`}>
-                          {w.status === 'completed' ? 'Đã duyệt' : w.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {w.status === 'pending' && (
-                          <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => handleApproveWithdrawal(w)} className="px-2.5 py-1 text-[11px] font-bold bg-emerald-600 text-white rounded-lg">Duyệt</button>
-                            <button onClick={() => handleRejectWithdrawal(w)} className="px-2.5 py-1 text-[11px] font-bold bg-rose-600 text-white rounded-lg">Từ chối</button>
-                          </div>
-                        )}
-                      </td>
+                  {withdrawals.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-slate-500">Chưa có yêu cầu rút tiền nào</td>
                     </tr>
-                  ))}
+                  ) : (
+                    withdrawals.map((w) => (
+                      <tr key={w.id} className="hover:bg-slate-700/20">
+                        <td className="py-3 px-4 font-semibold text-white">{getUserEmail(w.user_id)}</td>
+                        <td className="py-3 px-4 font-bold text-rose-400">{Number(w.amount || 0).toLocaleString()}đ</td>
+                        <td className="py-3 px-4 text-slate-300">{w.bank_name} - {w.bank_account || w.account_number} ({w.account_holder || w.account_name})</td>
+                        <td className="py-3 px-4 text-slate-400">{formatDate(w.created_at)}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            w.status === 'completed' ? 'text-emerald-400 bg-emerald-500/10' : w.status === 'pending' ? 'text-amber-400 bg-amber-500/10' : 'text-rose-400 bg-rose-500/10'
+                          }`}>
+                            {w.status === 'completed' ? 'Đã duyệt' : w.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {w.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleApproveWithdrawal(w)}
+                                className="px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition shadow"
+                              >
+                                Duyệt
+                              </button>
+                              <button
+                                onClick={() => handleRejectWithdrawal(w)}
+                                className="px-3 py-1.5 text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition shadow"
+                              >
+                                Từ chối
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleResetWithdrawal(w)}
+                              className="px-2.5 py-1 text-[10px] font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition border border-slate-700"
+                            >
+                              Đặt lại
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -635,7 +655,8 @@ export default function AdminPage() {
                       value={newVoucher.code}
                       onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono uppercase outline-none focus:border-rose-500"
-                    />
+                    >
+                    </input>
                   </div>
                   <div>
                     <label className="text-[11px] text-slate-400 block mb-1">Tiêu Đề / Giảm Giá</label>
