@@ -317,7 +317,7 @@ export default function AccountPage() {
                         required
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="VO THANH TOAN"
+                        placeholder="NGUYEN VAN A"
                         className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white uppercase outline-none focus:border-rose-500"
                       />
                     </div>
@@ -328,7 +328,7 @@ export default function AccountPage() {
                         required
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        placeholder="0812646494"
+                        placeholder=""
                         className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
                       />
                     </div>
@@ -350,7 +350,6 @@ export default function AccountPage() {
                       <option value="Agribank">Agribank</option>
                       <option value="BIDV">BIDV</option>
                       <option value="Vietinbank">Vietinbank</option>
-                      <option value="MoMo">Ví MoMo</option>
                     </select>
                   </div>
 
@@ -362,7 +361,7 @@ export default function AccountPage() {
                         required
                         value={bankAccount}
                         onChange={(e) => setBankAccount(e.target.value)}
-                        placeholder="1110105082003"
+                        placeholder=""
                         className="w-full bg-slate-800/50 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-rose-500"
                       />
                     </div>
