@@ -154,64 +154,68 @@ export default function Home() {
   const avatarChar = (displayName[0] || 'U').toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
       
-      {/* HEADER TỐI ƯU RESPONSIVE */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800 px-4 sm:px-6 py-3">
+      {/* HEADER TỐI ƯU RESPONSIVE KHÔNG TRÀN MÉP */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 w-full max-w-full">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           
           {/* Logo bên trái */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-lg sm:text-xl shadow-lg shadow-rose-500/20 text-white">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-base sm:text-xl shadow-lg shadow-rose-500/20 text-white">
               S
             </div>
             <div>
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
+              <span className="font-extrabold text-xs sm:text-base tracking-tight text-white whitespace-nowrap">
                 SĂN SALE <span className="text-rose-500 font-black">HOÀN TIỀN</span>
               </span>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase hidden sm:block">Cashback Sàn TMĐT</p>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wider uppercase hidden sm:block">Cashback Sàn TMĐT</p>
             </div>
           </Link>
 
           {/* Menu Điều Hướng & Tài Khoản bên phải */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             
             {/* Nút thao tác Admin */}
             {isUserAdmin && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <Link
                   href="/admin/orders"
-                  className="text-[11px] sm:text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-1.5 rounded-lg transition"
+                  title="Duyệt đơn Shopee"
+                  className="text-[11px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2 py-1.5 rounded-lg transition flex items-center gap-1"
                 >
-                  📊 Duyệt đơn
+                  <span>📊</span>
+                  <span className="hidden sm:inline">Duyệt đơn</span>
                 </Link>
                 <Link
                   href="/admin"
-                  className="text-[11px] sm:text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1.5 rounded-lg transition"
+                  title="Trang quản trị"
+                  className="text-[11px] bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-1.5 rounded-lg transition flex items-center gap-1"
                 >
-                  ⚙ Quản trị
+                  <span>⚙</span>
+                  <span className="hidden sm:inline">Quản trị</span>
                 </Link>
               </div>
             )}
 
             {/* Trạng thái đăng nhập người dùng */}
             {user ? (
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Link
                   href="/profile"
-                  className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2 py-1.5 rounded-lg transition"
+                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-1.5 sm:px-2 py-1.5 rounded-lg transition max-w-[70px] sm:max-w-[120px]"
                 >
-                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
                     {avatarChar}
                   </div>
-                  <span className="text-xs font-semibold text-slate-200 max-w-[80px] sm:max-w-[120px] truncate">
+                  <span className="text-[10px] sm:text-xs font-semibold text-slate-200 truncate">
                     {displayName}
                   </span>
                 </Link>
 
                 <Link
                   href="/profile"
-                  className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition"
+                  className="text-[10px] sm:text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-1.5 sm:px-2 py-1.5 rounded-lg flex items-center transition shrink-0"
                 >
                   <span className="text-emerald-400 font-bold">
                     {Number(profile?.balance || 0).toLocaleString()}đ
@@ -220,7 +224,7 @@ export default function Home() {
 
                 <button
                   onClick={handleLogout}
-                  className="text-xs text-slate-400 hover:text-rose-400 transition px-1.5 py-1 font-medium"
+                  className="text-[10px] sm:text-xs text-slate-400 hover:text-rose-400 transition px-1 py-1 font-medium shrink-0"
                 >
                   Thoát
                 </button>
@@ -228,7 +232,7 @@ export default function Home() {
             ) : (
               <Link
                 href="/login"
-                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 px-3.5 py-2 rounded-xl transition shadow text-white"
+                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 px-3 py-1.5 sm:py-2 rounded-xl transition shadow text-white shrink-0"
               >
                 Đăng nhập
               </Link>
@@ -239,7 +243,7 @@ export default function Home() {
       </header>
 
       {/* HERO SECTION & FORM CHUYỂN LINK */}
-      <section className="relative overflow-hidden pt-8 sm:pt-12 pb-12 px-4">
+      <section className="relative overflow-hidden pt-8 sm:pt-12 pb-12 px-4 w-full max-w-full">
         <div className="max-w-3xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold uppercase tracking-wide mb-4">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
@@ -256,8 +260,8 @@ export default function Home() {
             Áp dụng cho mọi sản phẩm trên các sàn TMĐT. Rút tiền về ngân hàng nhanh chóng và minh bạch.
           </p>
 
-          {/* Ô input dán link linh hoạt trên Mobile & Desktop */}
-          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl text-left">
+          {/* Ô input dán link */}
+          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl text-left w-full">
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="relative w-full flex items-center">
                 <input
@@ -336,7 +340,7 @@ export default function Home() {
 
       {/* SẢN PHẨM BÁN CHẠY (HOT DEALS) */}
       {hotProducts.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 pb-12">
+        <section className="max-w-6xl mx-auto px-4 pb-12 w-full">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
               <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-white">
@@ -413,7 +417,7 @@ export default function Home() {
       )}
 
       {/* DANH MỤC VOUCHER */}
-      <section className="max-w-6xl mx-auto px-4 pb-16">
+      <section className="max-w-6xl mx-auto px-4 pb-16 w-full">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
             <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-white">
@@ -462,11 +466,11 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-slate-800/80 py-6 px-4 text-center text-xs text-slate-500 bg-[#0b1120]">
+      <footer className="border-t border-slate-800/80 py-6 px-4 text-center text-xs text-slate-500 bg-[#0b1120] w-full">
         <p>© 2026 Săn Sale Hoàn Tiền. Nền tảng mua sắm thông minh tối ưu hóa cashback.</p>
       </footer>
 
-      {/* MODAL HƯỚNG DẪN MUA SẮM (RESPONSIVE) */}
+      {/* MODAL HƯỚNG DẪN MUA SẮM */}
       {showGuideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-5 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
