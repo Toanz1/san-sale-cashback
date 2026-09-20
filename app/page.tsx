@@ -30,6 +30,29 @@ export default function Home() {
     { id: '4', platform: 'TikTok', code: 'TTSHOP20', title: 'Giảm 15% cho đơn đầu tiên', category: 'Khách mới', expire_time: 'Còn 2 ngày', affiliate_link: '' },
   ];
 
+  // Hàm tính toán số tiền hoàn thực tế từ giá và tỷ lệ
+  const calculateCashbackAmount = (price: any, rate: any) => {
+    const numPrice = Number(price) || 0;
+    if (!rate || numPrice === 0) return 0;
+
+    const rateStr = String(rate).trim();
+    if (rateStr.includes('%')) {
+      const percent = parseFloat(rateStr) || 0;
+      return Math.round((numPrice * percent) / 100);
+    }
+
+    if (rateStr.toLowerCase().includes('k')) {
+      return (parseFloat(rateStr) || 0) * 1000;
+    }
+
+    const directVal = Number(rateStr);
+    if (!isNaN(directVal) && directVal > 0) {
+      return directVal <= 100 ? Math.round((numPrice * directVal) / 100) : directVal;
+    }
+
+    return 0;
+  };
+
   const loadUserProfile = async (currentUser: any) => {
     try {
       const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
@@ -118,14 +141,12 @@ export default function Home() {
   };
 
   const handleConvert = async () => {
-    // 1. Kiểm tra bắt buộc đăng nhập
     if (!user) {
       alert('Vui lòng đăng nhập tài khoản để nhận tiền hoàn!');
       router.push('/login');
       return;
     }
 
-    // 2. Kiểm tra link đầu vào
     if (!inputUrl.trim()) {
       setErrorMessage('Vui lòng dán link sản phẩm (Shopee, Lazada, TikTok)!');
       return;
@@ -136,7 +157,6 @@ export default function Home() {
     setErrorMessage('');
 
     try {
-      // Dùng trực tiếp User ID riêng biệt (user_code dạng UID...) làm Sub ID
       const trackingUserId = profile?.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`;
 
       const res = await fetch('/api/convert', {
@@ -169,18 +189,15 @@ export default function Home() {
   };
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
-  
-  // Hiển thị User ID riêng biệt dạng UID...
   const displayUserId = profile?.user_code || (user?.id ? `UID${user.id.substring(0, 6).toUpperCase()}` : 'UID---');
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
       
-      {/* HEADER TỐI ƯU RESPONSIVE */}
+      {/* HEADER */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800 px-3 sm:px-6 py-2.5 sm:py-3 w-full max-w-full">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           
-          {/* Logo bên trái */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-base sm:text-xl shadow-lg shadow-rose-500/20 text-white">
               S
@@ -193,9 +210,8 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* Menu Điều Hướng & Tài Khoản bên phải */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            
+          {/* Menu Điều Hướng & Tài Khoản */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Nút Giới Thiệu Bạn Bè */}
             <Link
               href="/referral"
@@ -228,10 +244,9 @@ export default function Home() {
               </div>
             )}
 
-            {/* Trạng thái đăng nhập người dùng */}
+            {/* Trạng thái đăng nhập */}
             {user ? (
               <div className="flex items-center gap-1 sm:gap-2">
-                {/* Nút hiển thị User ID riêng */}
                 <Link
                   href="/profile"
                   className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2 py-1.5 rounded-lg transition shrink-0"
@@ -288,7 +303,6 @@ export default function Home() {
             Áp dụng cho mọi sản phẩm trên các sàn TMĐT. Rút tiền về ngân hàng nhanh chóng và minh bạch.
           </p>
 
-          {/* Ô input dán link */}
           <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/80 p-3 sm:p-4 rounded-2xl shadow-2xl text-left w-full">
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="relative w-full flex items-center">
@@ -325,7 +339,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Thông báo lỗi nếu có */}
             {errorMessage && (
               <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
                 <span>⚠️</span>
@@ -333,7 +346,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Hiển thị kết quả link hoàn tiền thành công */}
             {affiliateLink && (
               <div className="mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
                 <div>
@@ -351,7 +363,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Nút bấm mở lại Hướng Dẫn */}
             <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs">
               <span className="text-slate-400">💡 Mua sắm lần đầu?</span>
               <button
@@ -380,8 +391,7 @@ export default function Home() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {hotProducts.map((p) => {
-              const numRate = parseFloat(p.cashback_rate) || 5;
-              const estimatedCashback = Math.round((Number(p.price) * numRate) / 100);
+              const estimatedCashback = calculateCashbackAmount(p.price, p.cashback_rate);
 
               return (
                 <a
@@ -400,7 +410,7 @@ export default function Home() {
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       />
                       <div className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-md">
-                        {p.cashback_rate ? (p.cashback_rate.includes('%') ? p.cashback_rate : `${p.cashback_rate}%`) : '5%'}
+                        {p.cashback_rate ? (String(p.cashback_rate).includes('%') ? p.cashback_rate : `${p.cashback_rate}%`) : '5%'}
                       </div>
                       <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm text-[10px] text-slate-300 font-bold px-1.5 py-0.5 rounded">
                         {p.platform || 'Shopee'}
@@ -408,7 +418,7 @@ export default function Home() {
                     </div>
 
                     <div className="p-2.5 sm:p-3">
-                      <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition">
+                      <p className="text-xs font-semibold text-white line-clamp-2 leading-snug group-hover:text-rose-400 transition min-h-[32px]">
                         {p.title}
                       </p>
                       
@@ -423,6 +433,7 @@ export default function Home() {
                         )}
                       </div>
 
+                      {/* Khối tiền hoàn thực tế */}
                       <div className="mt-2 py-1 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                         <span className="text-[10px] text-slate-300">Hoàn tiền:</span>
                         <span className="text-[11px] font-black text-emerald-400">

@@ -6,9 +6,9 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function AccountPage() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('withdrawals'); // 'profile' | 'orders' | 'withdrawals'
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('withdrawals'); // 'profile' | 'orders' | 'withdrawals' | 'referrals'
 
   // State thông tin cá nhân
   const [userCode, setUserCode] = useState('');
@@ -20,11 +20,14 @@ export default function AccountPage() {
   // State mật khẩu rút tiền riêng biệt
   const [newWithdrawPin, setNewWithdrawPin] = useState('');
 
-  // State rút tiền & lịch sử
+  // State rút tiền, đơn hàng & bạn bè đã mời
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [inputPin, setInputPin] = useState('');
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [referredUsers, setReferredUsers] = useState<any[]>([]);
+  const [referralCount, setReferralCount] = useState(0);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
 
   useEffect(() => {
@@ -43,18 +46,21 @@ export default function AccountPage() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (prof) {
       setProfile(prof);
-      setUserCode(prof.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`);
+      const code = prof.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`;
+      setUserCode(code);
       setFullName(prof.full_name || '');
       setPhone(prof.phone || '');
       setBankName(prof.bank_name || 'MB Bank (Quân Đội)');
       setBankAccount(prof.bank_account || '');
+
+      fetchReferrals(code, user.id);
     }
 
     fetchWithdrawals(user.id);
     fetchOrders(user.id);
   };
 
-  const fetchWithdrawals = async (uid) => {
+  const fetchWithdrawals = async (uid: string) => {
     const { data } = await supabase
       .from('withdrawals')
       .select('*')
@@ -63,7 +69,7 @@ export default function AccountPage() {
     if (data) setWithdrawals(data);
   };
 
-  const fetchOrders = async (uid) => {
+  const fetchOrders = async (uid: string) => {
     const { data } = await supabase
       .from('cashback_orders')
       .select('*')
@@ -72,12 +78,33 @@ export default function AccountPage() {
     if (data) setOrders(data);
   };
 
+  const fetchReferrals = async (code: string, uid: string) => {
+    const { data, count } = await supabase
+      .from('profiles')
+      .select('id, email, created_at, balance', { count: 'exact' })
+      .or(`referred_by.eq.${code},referred_by.eq.${uid}`)
+      .order('created_at', { ascending: false });
+
+    setReferredUsers(data || []);
+    setReferralCount(count || 0);
+  };
+
+  // Sao chép link giới thiệu
+  const handleCopyReferralLink = () => {
+    if (typeof window !== 'undefined') {
+      const link = `${window.location.origin}/login?ref=${userCode}`;
+      navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
   // Lưu thông tin cá nhân & Đặt mật khẩu rút tiền mới
-  const handleSaveProfile = async (e) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingAction(true);
 
-    const updatePayload = {
+    const updatePayload: any = {
       full_name: fullName,
       phone: phone,
       bank_name: bankName,
@@ -94,14 +121,14 @@ export default function AccountPage() {
     if (error) {
       alert('Lỗi cập nhật: ' + error.message);
     } else {
-      setProfile(prev => ({ ...prev, ...updatePayload }));
+      setProfile((prev: any) => ({ ...prev, ...updatePayload }));
       setNewWithdrawPin('');
       alert('Lưu thông tin thành công!');
     }
   };
 
   // Gửi lệnh rút tiền kèm kiểm tra mật khẩu rút tiền tự đặt
-  const handleRequestWithdraw = async (e) => {
+  const handleRequestWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = Number(withdrawAmount);
     const currentBalance = Number(profile?.balance || 0);
@@ -155,7 +182,7 @@ export default function AccountPage() {
     const newBalance = currentBalance - amount;
     await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
-    setProfile(prev => ({ ...prev, balance: newBalance }));
+    setProfile((prev: any) => ({ ...prev, balance: newBalance }));
     setWithdrawAmount('');
     setInputPin('');
     setLoadingAction(false);
@@ -168,7 +195,7 @@ export default function AccountPage() {
     router.push('/');
   };
 
-  const renderStatusBadge = (status, note) => {
+  const renderStatusBadge = (status: string, note?: string) => {
     if (status === 'completed' || status === 'approved' || status === 'success') {
       return (
         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -195,7 +222,7 @@ export default function AccountPage() {
       {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl text-white">
               S
             </div>
@@ -205,7 +232,7 @@ export default function AccountPage() {
               </span>
               <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">CASHBACK SÀN TMĐT</p>
             </div>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs">
@@ -230,7 +257,7 @@ export default function AccountPage() {
             🏠 Trang chủ
           </Link>
           <Link href="/referral" className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-bold">
-            🎁 Mời bạn bè
+            🎁 Trang mời bạn bè
           </Link>
         </div>
 
@@ -253,6 +280,27 @@ export default function AccountPage() {
                 </div>
                 <div className="text-2xl">💳</div>
               </div>
+            </div>
+
+            {/* Khối Chia sẻ link giới thiệu nhanh */}
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>🎁</span> Link mời bạn bè
+                </span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                  Nhận 10% hoa hồng
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Bạn đã mời được <strong className="text-amber-400">{referralCount} người</strong>. Chia sẻ link để nhận thêm hoa hồng tự động khi bạn bè mua sắm!
+              </p>
+              <button
+                onClick={handleCopyReferralLink}
+                className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5"
+              >
+                <span>{copiedLink ? '✓ Đã sao chép link' : '🔗 Sao chép link mời'}</span>
+              </button>
             </div>
 
             {/* Menu Tabs */}
@@ -291,6 +339,17 @@ export default function AccountPage() {
               </button>
 
               <button
+                onClick={() => setActiveTab('referrals')}
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${
+                  activeTab === 'referrals'
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <span>👥</span> Bạn bè đã mời ({referralCount})
+              </button>
+
+              <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-400 flex items-center gap-3 transition"
               >
@@ -308,7 +367,6 @@ export default function AccountPage() {
                 <p className="text-xs text-slate-400 mb-6">Cập nhật thông tin nhận hoàn tiền và thiết lập mã bảo mật</p>
 
                 <form onSubmit={handleSaveProfile} className="space-y-4">
-                  {/* Ô hiển thị User ID riêng biệt cố định */}
                   <div className="p-4 bg-slate-800/40 border border-slate-700/70 rounded-xl flex items-center justify-between">
                     <div>
                       <span className="text-[11px] text-slate-400 block font-medium">User ID (Mã thành viên cố định)</span>
@@ -386,8 +444,8 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  {/* KHỐI ĐẶT MẬT KHẨU RÚT TIỀN TỰ ĐẶT */}
-                  <div className="p-4 bg-slate-850 bg-slate-800/30 border border-slate-700/70 rounded-xl space-y-2 mt-2">
+                  {/* KHỐI ĐẶT MẬT KHẨU RÚT TIỀN */}
+                  <div className="p-4 bg-slate-800/30 border border-slate-700/70 rounded-xl space-y-2 mt-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
                         <span>🔐</span> Mật khẩu rút tiền riêng (Tự đặt)
@@ -446,8 +504,8 @@ export default function AccountPage() {
                             <td className="py-3 font-mono">{o.order_id}</td>
                             <td className="py-3 text-emerald-400 font-bold">+{Number(o.cashback_amount).toLocaleString()}đ</td>
                             <td className="py-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] ${o.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                                {o.status === 'approved' ? 'Đã duyệt' : 'Chờ đối soát'}
+                              <span className={`px-2 py-0.5 rounded text-[10px] ${o.status === 'completed' || o.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                {o.status === 'completed' || o.status === 'approved' ? 'Đã duyệt' : 'Chờ đối soát'}
                               </span>
                             </td>
                             <td className="py-3 text-slate-500 text-[11px]">{new Date(o.created_at).toLocaleDateString('vi-VN')}</td>
@@ -482,7 +540,6 @@ export default function AccountPage() {
                       />
                     </div>
 
-                    {/* Ô NHẬP MẬT KHẨU RÚT TIỀN */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="text-xs text-slate-300">
@@ -566,6 +623,57 @@ export default function AccountPage() {
                 </div>
               </div>
             )}
+
+            {/* TAB 4: DANH SÁCH BẠN BÈ ĐÃ MỜI */}
+            {activeTab === 'referrals' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-white mb-0.5">Bạn bè đã tham gia</h2>
+                    <p className="text-xs text-slate-400">Tự động nhận 10% hoa hồng trên mỗi đơn hoàn tiền của cấp dưới</p>
+                  </div>
+                  <button
+                    onClick={handleCopyReferralLink}
+                    className="text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-lg transition"
+                  >
+                    {copiedLink ? '✓ Đã copy' : '🔗 Lấy link mời'}
+                  </button>
+                </div>
+
+                {referredUsers.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl space-y-2">
+                    <p className="text-xs text-slate-400">Bạn chưa mời thành viên nào.</p>
+                    <p className="text-[11px] text-slate-500">Hãy gửi link mời cho bạn bè để cùng kiếm tiền hoàn nhé!</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400">
+                          <th className="pb-3">Email thành viên</th>
+                          <th className="pb-3">Ngày tham gia</th>
+                          <th className="pb-3 text-right">Hoa hồng của bạn</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {referredUsers.map((ru) => (
+                          <tr key={ru.id} className="hover:bg-slate-800/30">
+                            <td className="py-3 font-semibold text-slate-200">{ru.email}</td>
+                            <td className="py-3 text-slate-500 text-[11px]">
+                              {new Date(ru.created_at).toLocaleDateString('vi-VN')}
+                            </td>
+                            <td className="py-3 text-right font-bold text-emerald-400">
+                              10% mỗi đơn
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
       </div>
