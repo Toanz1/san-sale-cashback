@@ -4,6 +4,35 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
+// Hàm chuyển đổi tất cả thông báo lỗi sang tiếng Việt
+function getVietnameseErrorMessage(error: any): string {
+  const msg = error?.message || '';
+
+  if (msg.includes('User already registered')) {
+    return 'Email này đã được đăng ký tài khoản. Vui lòng chuyển sang Đăng nhập!';
+  }
+  if (msg.includes('Invalid login credentials')) {
+    return 'Sai email hoặc mật khẩu. Vui lòng kiểm tra lại!';
+  }
+  if (msg.includes('Email not confirmed')) {
+    return 'Email chưa được kích hoạt. Vui lòng kiểm tra hộp thư để xác thực!';
+  }
+  if (msg.includes('Password should be at least')) {
+    return 'Mật khẩu phải có độ dài tối thiểu 6 ký tự!';
+  }
+  if (msg.includes('rate limit') || msg.includes('Too many requests')) {
+    return 'Bạn thao tác quá nhanh, vui lòng thử lại sau vài giây!';
+  }
+  if (msg.includes('Network request failed') || msg.includes('Failed to fetch')) {
+    return 'Lỗi kết nối mạng, vui lòng kiểm tra đường truyền!';
+  }
+  if (msg.includes('signup is disabled') || msg.includes('Signups not allowed')) {
+    return 'Hệ thống đang tạm khóa đăng ký tài khoản mới!';
+  }
+
+  return 'Thao tác không thành công, vui lòng kiểm tra lại thông tin!';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(false);
@@ -20,15 +49,17 @@ export default function LoginPage() {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Đăng ký thành công! Bạn có thể đăng nhập ngay.');
+        alert('Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay.');
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        alert('Đăng nhập thành công!');
         router.push('/');
       }
     } catch (err: any) {
-      alert(err.message || 'Thao tác thất bại');
+      // Gọi hàm hiển thị tiếng Việt
+      alert(getVietnameseErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -45,7 +76,7 @@ export default function LoginPage() {
       });
       if (error) throw error;
     } catch (err: any) {
-      alert('Đăng nhập Google thất bại: ' + (err.message || 'Lỗi không xác định'));
+      alert('Đăng nhập bằng Google thất bại, vui lòng thử lại!');
       setGoogleLoading(false);
     }
   };
@@ -75,7 +106,7 @@ export default function LoginPage() {
           onClick={handleGoogleLogin}
           disabled={googleLoading}
           type="button"
-          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold py-3 px-4 rounded-xl transition shadow-sm text-sm disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold py-3 px-4 rounded-xl transition shadow-sm text-sm disabled:opacity-50 cursor-pointer"
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -121,7 +152,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-rose-600/30 disabled:opacity-50 mt-2"
+            className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-rose-600/30 disabled:opacity-50 mt-2 cursor-pointer"
           >
             {loading ? 'Đang xử lý...' : (isSignUp ? 'Đăng ký tài khoản' : 'Đăng nhập')}
           </button>
@@ -131,7 +162,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-xs text-slate-400 hover:text-rose-400 transition"
+            className="text-xs text-slate-400 hover:text-rose-400 transition cursor-pointer"
           >
             {isSignUp ? 'Đã có tài khoản? Bấm để đăng nhập' : 'Chưa có tài khoản? Bấm để đăng ký'}
           </button>
