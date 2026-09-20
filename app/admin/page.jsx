@@ -17,6 +17,9 @@ export default function AdminPage() {
   const [vouchers, setVouchers] = useState([]);
   const [products, setProducts] = useState([]);
 
+  // Trạng thái quét tự động qua ScraperAPI
+  const [isScraping, setIsScraping] = useState(false);
+
   // Form voucher
   const [newVoucher, setNewVoucher] = useState({
     platform: 'Shopee',
@@ -75,7 +78,41 @@ export default function AdminPage() {
     checkAdmin();
   }, [router]);
 
-  // Thao tác duyệt rút tiền
+  // ================= TỰ ĐỘNG QUÉT THÔNG TIN SHOPEE =================
+  const handleAutoFetchProduct = async () => {
+    if (!newProduct.affiliate_link) {
+      alert('Vui lòng dán link Shopee vào ô trước khi quét!');
+      return;
+    }
+
+    setIsScraping(true);
+    try {
+      const res = await fetch('/api/scrape-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newProduct.affiliate_link })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setNewProduct((prev) => ({
+          ...prev,
+          title: data.name || prev.title,
+          image_url: data.image || prev.image_url,
+          price: data.price ? String(data.price) : prev.price
+        }));
+        alert('Đã lấy thành công Tên, Ảnh và Giá sản phẩm!');
+      } else {
+        alert(data.error || 'Không thể quét dữ liệu tự động, vui lòng nhập tay.');
+      }
+    } catch (err) {
+      alert('Lỗi kết nối tới máy chủ quét dữ liệu!');
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  // ================= THAO TÁC DUYỆT RÚT TIỀN =================
   const handleApproveWithdrawal = async (withdraw) => {
     if (!confirm(`Xác nhận đã chuyển khoản ${Number(withdraw.amount || 0).toLocaleString()}đ cho khách?`)) return;
     const { error } = await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', withdraw.id);
@@ -96,7 +133,7 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  // Quản lý voucher
+  // ================= QUẢN LÝ VOUCHER =================
   const handleAddVoucher = async (e) => {
     e.preventDefault();
     if (!newVoucher.code || !newVoucher.title) return alert('Vui lòng nhập đủ thông tin!');
@@ -119,11 +156,11 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  // Quản lý sản phẩm Hot
+  // ================= QUẢN LÝ SẢN PHẨM HOT =================
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!newProduct.title || !newProduct.image_url || !newProduct.affiliate_link) {
-      return alert('Vui lòng nhập đầy đủ tên, ảnh và link affiliate!');
+      return alert('Vui lòng điền đủ tên, ảnh và link affiliate!');
     }
     const { error } = await supabase.from('hot_products').insert([{
       title: newProduct.title,
@@ -321,8 +358,38 @@ export default function AdminPage() {
           <div className="space-y-6">
             <div className="bg-slate-800/60 border border-slate-700/70 rounded-2xl p-5 shadow-xl">
               <h2 className="text-base font-bold text-white mb-4">Thêm Sản Phẩm Bán Chạy Shopee / Lazada</h2>
-              <form onSubmit={handleAddProduct} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              
+              <form onSubmit={handleAddProduct} className="space-y-4">
+                {/* Dán link và nút Quét tự động đưa lên đầu */}
+                <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3.5">
+                  <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                    1. Link Tiếp Thị Liên Kết (Shopee Aff / Link sản phẩm)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="url"
+                      required
+                      placeholder="Dán link Shopee hoặc https://s.shopee.vn/... vào đây"
+                      value={newProduct.affiliate_link}
+                      onChange={(e) => setNewProduct({ ...newProduct, affiliate_link: e.target.value })}
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-rose-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAutoFetchProduct}
+                      disabled={isScraping}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shrink-0 disabled:opacity-50 shadow-md shadow-emerald-600/20"
+                    >
+                      {isScraping ? 'Đang quét...' : '⚡ Quét Tự Động'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Hệ thống sẽ tự động bóc tách Tên, Hình ảnh và Giá sản phẩm từ link Shopee dán ở trên.
+                  </p>
+                </div>
+
+                {/* Các trường thông tin sản phẩm */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                   <div>
                     <label className="text-[11px] text-slate-400 block mb-1">Sàn</label>
                     <select
@@ -394,24 +461,22 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 items-end pt-1">
-                  <div className="w-full">
-                    <label className="text-[11px] text-slate-400 block mb-1">
-                      Link Tiếp Thị Liên Kết (Shopee Aff / Accesstrade dẫn thẳng tới sản phẩm)
-                    </label>
-                    <input
-                      type="url"
-                      required
-                      placeholder="https://s.shopee.vn/... hoặc https://shorten.asia/..."
-                      value={newProduct.affiliate_link}
-                      onChange={(e) => setNewProduct({ ...newProduct, affiliate_link: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono outline-none focus:border-rose-500"
-                    />
+                {/* Khối xem trước ảnh và tên sau khi quét thành công */}
+                {newProduct.image_url && (
+                  <div className="flex items-center gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-700/60">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={newProduct.image_url} alt="Xem trước" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                    <div className="overflow-hidden">
+                      <p className="text-white font-bold text-xs truncate">{newProduct.title || 'Xem trước sản phẩm'}</p>
+                      <p className="text-rose-400 font-bold text-xs mt-0.5">{Number(newProduct.price || 0).toLocaleString()}đ</p>
+                    </div>
                   </div>
+                )}
 
+                <div className="flex justify-end pt-1">
                   <button
                     type="submit"
-                    className="w-full sm:w-48 shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2 rounded-xl transition shadow-lg shadow-rose-600/30"
+                    className="w-full sm:w-48 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-lg shadow-rose-600/30"
                   >
                     + Thêm Sản Phẩm
                   </button>
