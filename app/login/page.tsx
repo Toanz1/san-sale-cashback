@@ -53,13 +53,11 @@ function LoginForm() {
     if (refParam) {
       const formatted = refParam.trim().toUpperCase();
       setRefCode(formatted);
-      // Lưu vào localStorage để không bị mất khi redirect Google Auth
       if (typeof window !== 'undefined') {
         localStorage.setItem('cashback_ref_code', formatted);
       }
       setIsSignUp(true); // Tự động chuyển tab sang Đăng ký nếu vào từ link mời
     } else if (typeof window !== 'undefined') {
-      // Đọc lại từ localStorage nếu đã lưu từ trước
       const savedRef = localStorage.getItem('cashback_ref_code');
       if (savedRef) setRefCode(savedRef);
     }
@@ -71,7 +69,6 @@ function LoginForm() {
       const referrer = refCode || (typeof window !== 'undefined' ? localStorage.getItem('cashback_ref_code') : null);
       const myUserCode = `UID${userId.substring(0, 6).toUpperCase()}`;
 
-      // Kiểm tra hồ sơ hiện tại
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id, user_code, referred_by')
@@ -79,7 +76,7 @@ function LoginForm() {
         .maybeSingle();
 
       if (!existingProfile) {
-        // Tài khoản mới hoàn toàn: Tạo mới hồ sơ kèm người mời
+        // Tài khoản mới: Tạo hồ sơ kèm người mời
         await supabase.from('profiles').insert([{
           id: userId,
           email: userEmail,
@@ -88,17 +85,15 @@ function LoginForm() {
           balance: 0
         }]);
       } else {
-        // Nếu hồ sơ đã có nhưng chưa có mã user_code hoặc chưa có referred_by
+        // Tài khoản đã có từ trước: Không ghi đè referred_by cũ
         const updates: any = {};
         if (!existingProfile.user_code) updates.user_code = myUserCode;
-        if (!existingProfile.referred_by && referrer) updates.referred_by = referrer.trim().toUpperCase();
 
         if (Object.keys(updates).length > 0) {
           await supabase.from('profiles').update(updates).eq('id', userId);
         }
       }
 
-      // Đăng ký/đăng nhập xong thì xóa ref tạm trong localStorage
       if (typeof window !== 'undefined') {
         localStorage.removeItem('cashback_ref_code');
       }
@@ -174,10 +169,10 @@ function LoginForm() {
           {isSignUp ? 'Đăng ký để tích lũy tiền hoàn khi mua sắm' : 'Chào mừng bạn quay trở lại'}
         </p>
 
-        {/* Thông báo nếu đang đăng ký qua mã giới thiệu */}
-        {refCode && (
-          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-full text-[11px] font-semibold">
-            <span>🎁</span> Bạn đang tham gia qua mã mời: <strong className="font-mono">{refCode}</strong>
+        {/* Chỉ hiển thị thông báo mã mời khi ở tab ĐĂNG KÝ (isSignUp = true) */}
+        {isSignUp && refCode && (
+          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full text-xs font-semibold">
+            <span>🎁</span> Bạn đang tham gia qua mã mời: <strong className="font-mono text-amber-400">{refCode}</strong>
           </div>
         )}
       </div>
@@ -204,7 +199,7 @@ function LoginForm() {
         <span className="bg-slate-900 px-3 text-[11px] text-slate-500 font-medium uppercase absolute">Hoặc dùng Email</span>
       </div>
 
-      {/* Form Email / Pass */}
+      {/* Form Email / Password */}
       <form onSubmit={handleEmailAuth} className="space-y-3">
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1">Email</label>
