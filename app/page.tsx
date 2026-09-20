@@ -166,21 +166,8 @@ export default function Home() {
 
           {/* Menu Điều Hướng & Tài Khoản bên phải */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-            {/* Trỏ về /profile để xem đơn hàng & lịch sử hoàn tiền */}
-            <Link
-              href="/profile"
-              className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
-            >
-              Lịch sử
-            </Link>
-
-            {/* Trỏ về /profile để xem ví & rút tiền */}
-            <Link
-              href="/profile"
-              className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
-            >
-              Ví tiền
-            </Link>
+          
+          
 
             {/* Nút thao tác Admin (chỉ hiện khi là admin) */}
             {isUserAdmin && (
