@@ -34,6 +34,20 @@ export default function AdminPage() {
     expire_time: 'Hôm nay',
     affiliate_link: ''
   });
+  <div className="flex items-center gap-2">
+  <Link
+    href="/admin/orders"
+    className="text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-3 py-1.5 rounded-xl transition flex items-center gap-1"
+  >
+    <span>📊</span> Duyệt Shopee
+  </Link>
+  <Link
+    href="/"
+    className="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl transition"
+  >
+    ← Về Trang Chủ
+  </Link>
+</div>
 
   // Form sản phẩm hot
   const [newProduct, setNewProduct] = useState({
