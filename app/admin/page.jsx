@@ -19,6 +19,8 @@ export default function AdminPage() {
 
   // State lưu sản phẩm đang chỉnh sửa
   const [editingProduct, setEditingProduct] = useState(null);
+  // State lưu voucher đang chỉnh sửa
+  const [editingVoucher, setEditingVoucher] = useState(null);
 
   // Trạng thái quét tự động qua ScraperAPI
   const [isScraping, setIsScraping] = useState(false);
@@ -158,6 +160,36 @@ export default function AdminPage() {
     if (!confirm('Xác nhận xóa voucher này?')) return;
     await supabase.from('vouchers').delete().eq('id', id);
     fetchAllData();
+  };
+
+  // Mở modal sửa voucher
+  const handleOpenEditVoucher = (voucher) => {
+    setEditingVoucher({ ...voucher });
+  };
+
+  // Lưu voucher đã sửa
+  const handleSaveEditVoucher = async (e) => {
+    e.preventDefault();
+    if (!editingVoucher) return;
+
+    const { error } = await supabase
+      .from('vouchers')
+      .update({
+        platform: editingVoucher.platform,
+        code: editingVoucher.code.toUpperCase().trim(),
+        title: editingVoucher.title,
+        expire_time: editingVoucher.expire_time,
+        affiliate_link: editingVoucher.affiliate_link?.trim() || null
+      })
+      .eq('id', editingVoucher.id);
+
+    if (error) {
+      alert('Lỗi cập nhật voucher: ' + error.message);
+    } else {
+      alert('Cập nhật voucher thành công!');
+      setEditingVoucher(null);
+      fetchAllData();
+    }
   };
 
   // ================= QUẢN LÝ SẢN PHẨM HOT =================
@@ -396,7 +428,6 @@ export default function AdminPage() {
               <h2 className="text-base font-bold text-white mb-4">Thêm Sản Phẩm Bán Chạy Shopee / Lazada</h2>
               
               <form onSubmit={handleAddProduct} className="space-y-4">
-                {/* Dán link và nút Quét tự động */}
                 <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3.5">
                   <label className="text-xs font-bold text-slate-300 block mb-1.5">
                     1. Link Tiếp Thị Liên Kết (Shopee Aff / Link sản phẩm)
@@ -424,7 +455,6 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                {/* Các trường thông tin sản phẩm */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                   <div>
                     <label className="text-[11px] text-slate-400 block mb-1">Sàn</label>
@@ -497,7 +527,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Khối xem trước */}
                 {newProduct.image_url && (
                   <div className="flex items-center gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-700/60">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -538,7 +567,6 @@ export default function AdminPage() {
                       <p className="text-xs text-rose-400 font-black mt-1">{Number(p.price).toLocaleString()}đ</p>
                     </div>
                     
-                    {/* HÀNG NÚT THAO TÁC: MỞ LINK, SỬA, XÓA */}
                     <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <a href={p.affiliate_link} target="_blank" rel="noopener noreferrer" className="text-[11px] text-emerald-400 hover:underline">
                         Mở link ➔
@@ -655,9 +683,20 @@ export default function AdminPage() {
                       <td className="py-2.5 px-3 text-white">{v.title}</td>
                       <td className="py-2.5 px-3 font-mono text-emerald-400 truncate max-w-[150px]">{v.affiliate_link || 'Chưa gắn'}</td>
                       <td className="py-2.5 px-3 text-right">
-                        <button onClick={() => handleDeleteVoucher(v.id)} className="px-2 py-0.5 text-[11px] bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded">
-                          Xóa
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button 
+                            onClick={() => handleOpenEditVoucher(v)} 
+                            className="px-2 py-0.5 text-[11px] bg-amber-500/20 text-amber-400 hover:bg-amber-500 hover:text-white rounded transition font-medium"
+                          >
+                            Sửa
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteVoucher(v.id)} 
+                            className="px-2 py-0.5 text-[11px] bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded transition font-medium"
+                          >
+                            Xóa
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -821,6 +860,103 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setEditingProduct(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition shadow-lg shadow-rose-600/30"
+                  >
+                    Lưu thay đổi 💾
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODAL POPUP CHỈNH SỬA VOUCHER ================= */}
+        {editingVoucher && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
+                  🎟️ Chỉnh Sửa Voucher #{editingVoucher.id}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingVoucher(null)}
+                  className="text-slate-400 hover:text-white text-lg font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditVoucher} className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Sàn TMĐT</label>
+                    <select
+                      value={editingVoucher.platform}
+                      onChange={(e) => setEditingVoucher({ ...editingVoucher, platform: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                    >
+                      <option value="Shopee">Shopee</option>
+                      <option value="Lazada">Lazada</option>
+                      <option value="TikTok">TikTok Shop</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-400 block mb-1">Mã Voucher</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingVoucher.code}
+                      onChange={(e) => setEditingVoucher({ ...editingVoucher, code: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono uppercase outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Tiêu đề / Mức giảm</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingVoucher.title}
+                    onChange={(e) => setEditingVoucher({ ...editingVoucher, title: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Hạn dùng</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Hôm nay, 23:59"
+                    value={editingVoucher.expire_time || ''}
+                    onChange={(e) => setEditingVoucher({ ...editingVoucher, expire_time: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 block mb-1">Link Tiếp Thị Liên Kết (Affiliate)</label>
+                  <input
+                    type="url"
+                    placeholder="https://s.shopee.vn/... hoặc https://shorten.asia/..."
+                    value={editingVoucher.affiliate_link || ''}
+                    onChange={(e) => setEditingVoucher({ ...editingVoucher, affiliate_link: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditingVoucher(null)}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition"
                   >
                     Hủy
