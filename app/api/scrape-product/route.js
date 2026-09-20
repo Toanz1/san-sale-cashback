@@ -3,66 +3,69 @@ import { NextResponse } from 'next/server';
 export async function POST(req) {
   try {
     const { url } = await req.json();
-    if (!url || (!url.includes('shopee.vn') && !url.includes('s.shopee.vn'))) {
-      return NextResponse.json({ error: 'Vui lòng nhập link Shopee hợp lệ' }, { status: 400 });
+    if (!url) {
+      return NextResponse.json({ error: 'Vui lòng cung cấp link Shopee' }, { status: 400 });
     }
 
     const apiKey = process.env.SCRAPER_API_KEY || 'a8aad209b24fb9c0ba97238f1eff3760';
-    let rawUrl = url.trim();
+    let targetUrl = url.trim();
 
-    // 1. Xử lý giải mã link rút gọn s.shopee.vn
-    if (rawUrl.includes('s.shopee.vn')) {
+    // 1. Mở rộng link rút gọn nếu là s.shopee.vn
+    if (targetUrl.includes('s.shopee.vn')) {
       try {
-        const expandRes = await fetch(rawUrl, {
+        const resShort = await fetch(targetUrl, {
           method: 'GET',
           redirect: 'follow',
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
         });
-        if (expandRes.url) rawUrl = expandRes.url;
+        if (resShort.url) targetUrl = resShort.url;
       } catch (e) {
-        console.error('Lỗi giải mã s.shopee.vn:', e);
+        console.error('Lỗi giải mã s.shopee:', e);
       }
     }
 
-    // Decode URL để đọc được tiếng Việt và cấu trúc id
-    const decodedUrl = decodeURIComponent(rawUrl);
+    const decoded = decodeURIComponent(targetUrl);
 
-    // 2. Tìm shopid và itemid bằng Regex
-    // Dạng 1: shopee.vn/...-i.123456.789012
-    // Dạng 2: shopee.vn/product/123456/789012
+    // 2. Tìm shopid và itemid
     let shopId = null;
     let itemId = null;
 
-    const pattern1 = /-i\.(\d+)\.(\d+)/;
-    const match1 = decodedUrl.match(pattern1);
+    // Định dạng: -i.12345.67890
+    const match1 = decoded.match(/-i\.(\d+)\.(\d+)/);
     if (match1) {
       shopId = match1[1];
       itemId = match1[2];
     } else {
-      const pattern2 = /product\/(\d+)\/(\d+)/;
-      const match2 = decodedUrl.match(pattern2);
+      // Định dạng: product/12345/67890
+      const match2 = decoded.match(/product\/(\d+)\/(\d+)/);
       if (match2) {
         shopId = match2[1];
         itemId = match2[2];
       }
     }
 
-    // CÁCH 1: Nếu trích xuất được shopId & itemId -> Gọi API dữ liệu chính thống của Shopee qua ScraperAPI
+    // 3. Gọi API v2 của Shopee thông qua ScraperAPI
     if (shopId && itemId) {
-      const shopeeApiUrl = `https://shopee.vn/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
-      const proxyApiUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(shopeeApiUrl)}&country_code=vn`;
+      const shopeeApi = `https://shopee.vn/api/v2/item/get?itemid=${itemId}&shopid=${shopId}`;
+      const scraperUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(shopeeApi)}&keep_headers=true&country_code=vn`;
 
       try {
-        const apiRes = await fetch(proxyApiUrl);
-        const apiJson = await apiRes.json();
+        const apiRes = await fetch(scraperUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': `https://shopee.vn/product/${shopId}/${itemId}`,
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
 
-        if (apiJson?.data) {
-          const item = apiJson.data;
+        const data = await apiRes.json();
+        const item = data?.item;
+
+        if (item) {
           const name = item.name || '';
           const image = item.image ? `https://down-vn.img.susercontent.com/file/${item.image}` : '';
-          // Giá Shopee lưu dạng x100,000 (chia cho 100,000 để ra VNĐ)
           const price = item.price ? Math.round(item.price / 100000) : 0;
           const originalPrice = item.price_before_discount ? Math.round(item.price_before_discount / 100000) : 0;
 
@@ -75,51 +78,43 @@ export async function POST(req) {
           });
         }
       } catch (err) {
-        console.error('Lỗi khi gọi API Shopee, chuyển sang quét HTML dự phòng:', err);
+        console.error('Lỗi API v2:', err);
       }
     }
 
-    // CÁCH 2: DỰ PHÒNG - Quét toàn bộ HTML gốc nguyên bản
-    const proxyHtmlUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(rawUrl)}&render=true&country_code=vn`;
-    const res = await fetch(proxyHtmlUrl);
-    const html = await res.text();
+    // 4. Nếu không lấy được qua API, cào meta bằng chế độ render JavaScript
+    const scrapePageUrl = `https://api.scraperapi.com?api_key=${apiKey}&url=${encodeURIComponent(decoded)}&render=true&country_code=vn`;
+    const pageRes = await fetch(scrapePageUrl);
+    const html = await pageRes.text();
 
-    // Bóc tách OpenGraph
-    const imgMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
-    const image = imgMatch ? imgMatch[1] : '';
+    const imgMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["'](.*?)["']/i);
+    const titleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["'](.*?)["']/i);
 
-    const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i);
     let name = titleMatch ? titleMatch[1].replace(/ \| Shopee Việt Nam/gi, '').trim() : '';
+    let image = imgMatch ? imgMatch[1] : '';
 
     let price = 0;
-    const priceMetaMatch = html.match(/<meta\s+property=["']product:price:amount["']\s+content=["'](.*?)["']/i);
-    if (priceMetaMatch) {
-      price = Number(priceMetaMatch[1]);
-    } else {
-      const schemaMatch = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s);
-      if (schemaMatch) {
-        try {
-          const schemaData = JSON.parse(schemaMatch[1]);
-          price = Number(schemaData.offers?.price || schemaData.offers?.lowPrice || 0);
-        } catch {}
-      }
+    const priceMatch = html.match(/<meta[^>]*property=["']product:price:amount["'][^>]*content=["'](.*?)["']/i);
+    if (priceMatch) {
+      price = Number(priceMatch[1]);
     }
 
-    if (!name && !image) {
+    if (name || image) {
       return NextResponse.json({
-        error: 'Không tìm thấy dữ liệu sản phẩm. Vui lòng kiểm tra lại link hoặc nhập tay.'
-      }, { status: 422 });
+        success: true,
+        name,
+        image,
+        price,
+        originalPrice: 0
+      });
     }
 
     return NextResponse.json({
-      success: true,
-      name,
-      image,
-      price: price > 0 ? price : 0,
-      originalPrice: 0
-    });
+      error: 'Shopee đang bật bảo vệ CAPTCHA. Bạn vui lòng copy tên, giá và link ảnh điền tay giúp mình nhé!'
+    }, { status: 422 });
+
   } catch (error) {
-    console.error('Lỗi scrape:', error);
-    return NextResponse.json({ error: 'Lỗi máy chủ khi quét dữ liệu' }, { status: 500 });
+    console.error('Lỗi route scrape:', error);
+    return NextResponse.json({ error: 'Lỗi hệ thống khi quét dữ liệu' }, { status: 500 });
   }
 }
