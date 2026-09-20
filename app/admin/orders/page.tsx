@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function AdminOrdersPage() {
+function AdminOrdersContent() {
   const router = useRouter();
 
   const [users, setUsers] = useState<any[]>([]);
@@ -151,7 +151,7 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Xử lý đối soát hàng loạt (Paste từ Excel: Cột 1 = Mã đơn, Cột 2 = User ID hoặc Mã UID, Cột 3 = Tiền hoàn)
+  // Xử lý đối soát hàng loạt
   const handleProcessBatch = async () => {
     if (!batchText.trim()) {
       alert('Vui lòng dán dữ liệu copy từ file Excel/Sheets!');
@@ -167,12 +167,11 @@ export default function AdminOrdersPage() {
       const parts = line.split(/[\t,]/).map((p) => p.trim());
       if (parts.length >= 3) {
         const orderId = parts[0];
-        const userIdentifier = parts[1]; // Có thể là UUID hoặc UID123456
+        const userIdentifier = parts[1];
         const cashback = Number(parts[2].replace(/[^\d]/g, ''));
 
         if (orderId && userIdentifier && !isNaN(cashback) && cashback > 0) {
           try {
-            // Tìm user tương ứng theo ID hoặc theo mã user_code
             const { data: buyer } = await supabase
               .from('profiles')
               .select('id, balance, referred_by')
@@ -180,7 +179,6 @@ export default function AdminOrdersPage() {
               .maybeSingle();
 
             if (buyer) {
-              // Thêm đơn hàng
               await supabase.from('cashback_orders').insert([
                 {
                   order_id: orderId,
@@ -191,13 +189,11 @@ export default function AdminOrdersPage() {
                 },
               ]);
 
-              // Cộng tiền hoàn cho người mua
               await supabase
                 .from('profiles')
                 .update({ balance: Number(buyer.balance || 0) + cashback })
                 .eq('id', buyer.id);
 
-              // Chia hoa hồng giới thiệu tự động
               const reward = await processReferralReward(buyer, cashback);
               if (reward > 0) totalCommissionSent += reward;
 
@@ -433,5 +429,17 @@ export default function AdminOrdersPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-slate-100">
+        <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <AdminOrdersContent />
+    </Suspense>
   );
 }

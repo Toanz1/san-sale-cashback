@@ -11,16 +11,16 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('withdrawals');
   const [loading, setLoading] = useState(true);
 
-  const [users, setUsers] = useState([]);
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [vouchers, setVouchers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
 
   // State lưu sản phẩm đang chỉnh sửa
-  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   // State lưu voucher đang chỉnh sửa
-  const [editingVoucher, setEditingVoucher] = useState(null);
+  const [editingVoucher, setEditingVoucher] = useState<any>(null);
 
   // Trạng thái quét tự động qua ScraperAPI
   const [isScraping, setIsScraping] = useState(false);
@@ -51,8 +51,26 @@ export default function AdminPage() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const { data: usersData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-      setUsers(usersData || []);
+      const { data: usersData } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (usersData) {
+        // Tính số lượng F1 đã mời cho từng user
+        const mappedUsers = usersData.map((u) => {
+          const inviteCount = usersData.filter(
+            (sub) => sub.referred_by && (sub.referred_by || '').toUpperCase() === (u.user_code || '').toUpperCase()
+          ).length;
+          return {
+            ...u,
+            invite_count: inviteCount,
+          };
+        });
+        setUsers(mappedUsers);
+      } else {
+        setUsers([]);
+      }
 
       const { data: withData } = await supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
       setWithdrawals(withData || []);
@@ -105,7 +123,7 @@ export default function AdminPage() {
           title: data.name || prev.title,
           image_url: data.image || prev.image_url,
           price: data.price ? String(data.price) : prev.price,
-          original_price: data.originalPrice ? String(data.originalPrice) : prev.originalPrice
+          original_price: data.originalPrice ? String(data.originalPrice) : prev.original_price
         }));
         alert('Đã lấy thành công Tên, Ảnh và Giá sản phẩm!');
       } else {
@@ -119,14 +137,14 @@ export default function AdminPage() {
   };
 
   // ================= THAO TÁC DUYỆT RÚT TIỀN =================
-  const handleApproveWithdrawal = async (withdraw) => {
+  const handleApproveWithdrawal = async (withdraw: any) => {
     if (!confirm(`Xác nhận đã chuyển khoản ${Number(withdraw.amount || 0).toLocaleString()}đ cho khách?`)) return;
     const { error } = await supabase.from('withdrawals').update({ status: 'completed' }).eq('id', withdraw.id);
     if (error) alert('Lỗi: ' + error.message);
     else { alert('Duyệt thành công!'); fetchAllData(); }
   };
 
-  const handleRejectWithdrawal = async (withdraw) => {
+  const handleRejectWithdrawal = async (withdraw: any) => {
     const reason = prompt('Nhập lý do từ chối (Hoàn tiền lại ví user):', 'Sai thông tin STK');
     if (reason === null) return;
     const { error } = await supabase.from('withdrawals').update({ status: 'rejected', note: reason }).eq('id', withdraw.id);
@@ -139,7 +157,7 @@ export default function AdminPage() {
     fetchAllData();
   };
 
-  const handleResetWithdrawal = async (withdraw) => {
+  const handleResetWithdrawal = async (withdraw: any) => {
     if (!confirm('Chuyển lại trạng thái thành Chờ duyệt?')) return;
     const { error } = await supabase.from('withdrawals').update({ status: 'pending' }).eq('id', withdraw.id);
     if (error) alert('Lỗi: ' + error.message);
@@ -147,7 +165,7 @@ export default function AdminPage() {
   };
 
   // ================= QUẢN LÝ VOUCHER =================
-  const handleAddVoucher = async (e) => {
+  const handleAddVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVoucher.code || !newVoucher.title) return alert('Vui lòng nhập đủ thông tin!');
     const { error } = await supabase.from('vouchers').insert([{
@@ -163,17 +181,17 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteVoucher = async (id) => {
+  const handleDeleteVoucher = async (id: any) => {
     if (!confirm('Xác nhận xóa voucher này?')) return;
     await supabase.from('vouchers').delete().eq('id', id);
     fetchAllData();
   };
 
-  const handleOpenEditVoucher = (voucher) => {
+  const handleOpenEditVoucher = (voucher: any) => {
     setEditingVoucher({ ...voucher });
   };
 
-  const handleSaveEditVoucher = async (e) => {
+  const handleSaveEditVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVoucher) return;
 
@@ -198,7 +216,7 @@ export default function AdminPage() {
   };
 
   // ================= QUẢN LÝ SẢN PHẨM HOT =================
-  const handleAddProduct = async (e) => {
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.title || !newProduct.image_url || !newProduct.affiliate_link) {
       return alert('Vui lòng điền đủ tên, ảnh và link affiliate!');
@@ -228,17 +246,17 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteProduct = async (id) => {
+  const handleDeleteProduct = async (id: any) => {
     if (!confirm('Xác nhận xóa sản phẩm này?')) return;
     await supabase.from('hot_products').delete().eq('id', id);
     fetchAllData();
   };
 
-  const handleOpenEdit = (product) => {
+  const handleOpenEdit = (product: any) => {
     setEditingProduct({ ...product });
   };
 
-  const handleSaveEditProduct = async (e) => {
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
 
@@ -264,17 +282,17 @@ export default function AdminPage() {
     }
   };
 
-  const getUserEmail = (userId) => {
+  const getUserEmail = (userId: any) => {
     const found = users.find((u) => String(u.id) === String(userId));
     return found?.email || String(userId || '').slice(0, 8);
   };
 
-  const getUserCode = (userId) => {
+  const getUserCode = (userId: any) => {
     const found = users.find((u) => String(u.id) === String(userId));
     return found?.user_code || `UID${String(userId || '').substring(0, 6).toUpperCase()}`;
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr: any) => {
     if (!dateStr) return 'Vừa xong';
     try {
       const d = new Date(dateStr);
@@ -762,12 +780,14 @@ export default function AdminPage() {
               />
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-700 text-slate-400 uppercase text-[10px]">
                     <th className="py-2.5 px-3">USER ID</th>
                     <th className="py-2.5 px-3">Email</th>
                     <th className="py-2.5 px-3">Họ Tên</th>
+                    <th className="py-2.5 px-3">Người Mời (Tuyến trên)</th>
+                    <th className="py-2.5 px-3 text-center">Đã mời (F1)</th>
                     <th className="py-2.5 px-3">Số Dư</th>
                     <th className="py-2.5 px-3">Ngân Hàng</th>
                   </tr>
@@ -775,16 +795,30 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-slate-700/60">
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-6 text-center text-slate-500">Không tìm thấy thành viên nào</td>
+                      <td colSpan={7} className="py-6 text-center text-slate-500">Không tìm thấy thành viên nào</td>
                     </tr>
                   ) : (
                     filteredUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-700/20">
                         <td className="py-2.5 px-3 font-mono font-bold text-amber-400">
-                          {u.user_code || `UID${u.id.substring(0, 6).toUpperCase()}`}
+                          {u.user_code || `UID${String(u.id).substring(0, 6).toUpperCase()}`}
                         </td>
                         <td className="py-2.5 px-3 text-slate-200 font-medium">{u.email}</td>
                         <td className="py-2.5 px-3 text-slate-300">{u.full_name || 'Chưa đặt'}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-400">
+                          {u.referred_by ? (
+                            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-rose-400 font-bold">
+                              {u.referred_by}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">Không có</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            👥 {u.invite_count || 0} người
+                          </span>
+                        </td>
                         <td className="py-2.5 px-3 text-emerald-400 font-bold">
                           {Number(u.balance || 0).toLocaleString()}đ
                         </td>
