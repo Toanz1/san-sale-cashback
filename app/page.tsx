@@ -12,9 +12,10 @@ export default function Home() {
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [hotProducts, setHotProducts] = useState<any[]>([]);
-  
-  // State quản lý Modal Hướng dẫn
+
+  // State quản lý Modal Hướng dẫn tự động bật
   const [showGuideModal, setShowGuideModal] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
 
   const ADMIN_EMAIL = 'toanzin00001@gmail.com';
 
@@ -62,6 +63,12 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Kiểm tra và tự động mở modal nếu chưa chọn ẩn
+    const hasSeenGuide = localStorage.getItem('has_seen_cashback_guide');
+    if (!hasSeenGuide) {
+      setShowGuideModal(true);
+    }
+
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user || null;
@@ -83,6 +90,13 @@ export default function Home() {
       subscription.unsubscribe();
     };
   }, []);
+
+  const handleCloseGuide = () => {
+    if (dontShowAgain) {
+      localStorage.setItem('has_seen_cashback_guide', 'true');
+    }
+    setShowGuideModal(false);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -259,7 +273,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Nút bấm xem Hướng Dẫn Mua Sắm */}
+            {/* Nút bấm mở lại Hướng Dẫn */}
             <div className="mt-3.5 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs">
               <span className="text-slate-400">💡 Mua sắm lần đầu?</span>
               <button
@@ -388,9 +402,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= MODAL HƯỚNG DẪN MUA SẮM 3 BƯỚC ================= */}
+      {/* ================= MODAL HƯỚNG DẪN MUA SẮM (TỰ ĐỘNG BẬT KHI VÀO TRANG) ================= */}
       {showGuideModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 sm:p-7 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-extrabold text-base sm:text-lg text-white flex items-center gap-2">
@@ -398,70 +412,82 @@ export default function Home() {
               </h3>
               <button
                 type="button"
-                onClick={() => setShowGuideModal(false)}
+                onClick={handleCloseGuide}
                 className="text-slate-400 hover:text-white text-xl font-bold px-2 py-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-4 text-xs sm:text-sm">
-              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
-                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+            <div className="space-y-3.5 text-xs sm:text-sm">
+              <div className="flex gap-3.5 items-start bg-slate-800/60 border border-slate-700/60 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs shadow-md shadow-rose-500/30">
                   1
                 </span>
                 <div>
                   <h4 className="font-bold text-white mb-0.5">Tìm sản phẩm & Sao chép link</h4>
                   <p className="text-slate-400 text-xs leading-relaxed">
-                    Vào ứng dụng Shopee/Lazada, tìm món đồ bạn muốn mua rồi bấm nút <strong>Chia sẻ ➔ Sao chép liên kết</strong>.
+                    Vào ứng dụng Shopee/Lazada, chọn món đồ cần mua rồi bấm <strong>Chia sẻ ➔ Sao chép liên kết</strong>.
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
-                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+              <div className="flex gap-3.5 items-start bg-slate-800/60 border border-slate-700/60 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs shadow-md shadow-rose-500/30">
                   2
                 </span>
                 <div>
-                  <h4 className="font-bold text-white mb-0.5">Dán link vào trang & Lấy link hoàn tiền</h4>
+                  <h4 className="font-bold text-white mb-0.5">Dán link vào trang & Nhận link hoàn tiền</h4>
                   <p className="text-slate-400 text-xs leading-relaxed">
-                    Dán link vào ô nhập phía trên, bấm <strong>Lấy Link Hoàn Tiền</strong>, sau đó bấm <strong>Đi Tới Mua Hàng</strong> để hệ thống gắn mã cashback của bạn.
+                    Dán link vào ô nhập, bấm <strong>Lấy Link Hoàn Tiền</strong>, sau đó bấm <strong>Đi Tới Mua Hàng</strong> để hệ thống ghi nhận tài khoản của bạn.
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3.5 items-start bg-slate-800/50 border border-slate-700/50 p-3.5 rounded-2xl">
-                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+              <div className="flex gap-3.5 items-start bg-slate-800/60 border border-slate-700/60 p-3.5 rounded-2xl">
+                <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center shrink-0 text-xs shadow-md shadow-rose-500/30">
                   3
                 </span>
                 <div>
-                  <h4 className="font-bold text-white mb-0.5">Thanh toán đơn hàng ngay lập tức</h4>
+                  <h4 className="font-bold text-white mb-0.5">Thanh toán đơn hàng ngay</h4>
                   <p className="text-slate-400 text-xs leading-relaxed">
-                    Tiến hành đặt hàng luôn trên ứng dụng. Đơn hàng sẽ được ghi nhận vào mục <strong>Trang cá nhân ➔ Đơn hàng</strong> trong vòng 1-2 tiếng!
+                    Hoàn tất đặt hàng. Tiền hoàn sẽ được ghi nhận vào mục <strong>Tài khoản ➔ Đơn hàng</strong> sau 1-2 tiếng.
                   </p>
                 </div>
               </div>
 
-              {/* Cảnh báo quan trọng */}
+              {/* Hộp lưu ý chống mất hoa hồng */}
               <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1">
                 <p className="font-bold flex items-center gap-1.5">
-                  ⚠️ Lưu ý quan trọng để không bị mất hoàn tiền:
+                  ⚠️ Lưu ý quan trọng để không bị mất đơn:
                 </p>
                 <ul className="list-disc list-inside text-amber-200/80 space-y-1 text-[11px] leading-relaxed">
                   <li>Không bấm qua link của người khác hoặc group săn sale sau khi đã lấy link.</li>
-                  <li>Phải đặt hàng và thanh toán trên cùng một thiết bị vừa bấm link.</li>
-                  <li>Không thoát tài khoản sàn hoặc đổi tài khoản khác khi đang mua.</li>
+                  <li>Phải đặt hàng và thanh toán trên cùng thiết bị vừa bấm link.</li>
+                  <li>Không thoát hoặc đổi tài khoản sàn khi đang thanh toán.</li>
                 </ul>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowGuideModal(false)}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs transition shadow-lg shadow-rose-600/30"
-            >
-              Tôi Đã Hiểu & Bắt Đầu Mua Sắm! 🚀
-            </button>
+            <div className="pt-2 space-y-3">
+              <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={dontShowAgain}
+                  onChange={(e) => setDontShowAgain(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-rose-600 focus:ring-rose-500 accent-rose-500"
+                />
+                <span>Không tự động hiển thị lại bảng này lần sau</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleCloseGuide}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold text-xs transition shadow-lg shadow-rose-600/30 tracking-wide uppercase"
+              >
+                Tôi Đã Hiểu & Bắt Đầu Săn Sale! 🚀
+              </button>
+            </div>
           </div>
         </div>
       )}
