@@ -10,8 +10,8 @@ export default function AccountPage() {
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('withdrawals'); // 'profile' | 'orders' | 'withdrawals'
 
-  // State thông tin cá nhân & username riêng
-  const [username, setUsername] = useState('');
+  // State thông tin cá nhân
+  const [userCode, setUserCode] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [bankName, setBankName] = useState('MB Bank (Quân Đội)');
@@ -43,7 +43,7 @@ export default function AccountPage() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (prof) {
       setProfile(prof);
-      setUsername(prof.username || '');
+      setUserCode(prof.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`);
       setFullName(prof.full_name || '');
       setPhone(prof.phone || '');
       setBankName(prof.bank_name || 'MB Bank (Quân Đội)');
@@ -72,22 +72,18 @@ export default function AccountPage() {
     if (data) setOrders(data);
   };
 
-  // Lưu thông tin cá nhân, Username & Đặt mật khẩu rút tiền mới
+  // Lưu thông tin cá nhân & Đặt mật khẩu rút tiền mới
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setLoadingAction(true);
 
-    const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-
     const updatePayload = {
-      username: cleanUsername || null,
       full_name: fullName,
       phone: phone,
       bank_name: bankName,
       bank_account: bankAccount,
     };
 
-    // Nếu người dùng có nhập mật khẩu rút tiền mới thì cập nhật
     if (newWithdrawPin.trim()) {
       updatePayload.withdraw_pin = newWithdrawPin.trim();
     }
@@ -96,11 +92,7 @@ export default function AccountPage() {
 
     setLoadingAction(false);
     if (error) {
-      if (error.code === '23505') {
-        alert('Tên định danh (Username) này đã được người khác sử dụng. Vui lòng chọn tên khác!');
-      } else {
-        alert('Lỗi cập nhật: ' + error.message);
-      }
+      alert('Lỗi cập nhật: ' + error.message);
     } else {
       setProfile(prev => ({ ...prev, ...updatePayload }));
       setNewWithdrawPin('');
@@ -114,14 +106,12 @@ export default function AccountPage() {
     const amount = Number(withdrawAmount);
     const currentBalance = Number(profile?.balance || 0);
 
-    // 1. Kiểm tra tài khoản đã tạo mật khẩu rút tiền chưa
     if (!profile?.withdraw_pin) {
       alert('Bạn chưa thiết lập Mật khẩu rút tiền! Vui lòng sang tab "Thông tin tài khoản" để đặt mật khẩu trước.');
       setActiveTab('profile');
       return;
     }
 
-    // 2. Kiểm tra thông tin ngân hàng
     if (!bankAccount || !fullName) {
       alert('Vui lòng cập nhật đầy đủ Số tài khoản và Họ tên ở tab Thông tin tài khoản trước!');
       setActiveTab('profile');
@@ -138,7 +128,6 @@ export default function AccountPage() {
       return;
     }
 
-    // 3. So khớp mật khẩu rút tiền đã tự đặt
     if (inputPin.trim() !== String(profile.withdraw_pin).trim()) {
       alert('Mật khẩu rút tiền không đúng! Vui lòng kiểm tra lại.');
       return;
@@ -163,7 +152,6 @@ export default function AccountPage() {
       return;
     }
 
-    // Trừ số dư khả dụng
     const newBalance = currentBalance - amount;
     await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
 
@@ -202,10 +190,6 @@ export default function AccountPage() {
     );
   };
 
-  const userDisplayName = profile?.username 
-    ? `@${profile.username}` 
-    : (fullName || user?.email?.split('@')[0]);
-
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans">
       {/* Header */}
@@ -225,12 +209,9 @@ export default function AccountPage() {
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs">
-              <span className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center font-bold text-[10px] text-white">
-                {(profile?.username || user?.email || 'U').charAt(0).toUpperCase()}
-              </span>
-              <span className="text-slate-300 font-medium font-mono">
-                {profile?.username ? `@${profile.username}` : user?.email}
-              </span>
+              <span className="text-amber-400 font-extrabold font-mono text-[11px]">{userCode || 'UID---'}</span>
+              <span className="text-slate-400">|</span>
+              <span className="text-slate-300 font-medium text-[11px]">{user?.email}</span>
             </div>
             <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-rose-400 transition">
               Thoát
@@ -257,11 +238,11 @@ export default function AccountPage() {
           {/* Cột trái */}
           <div className="lg:col-span-4 space-y-6">
             <div className="rounded-2xl overflow-hidden border border-slate-800 bg-gradient-to-br from-rose-500 via-orange-500 to-amber-500 p-6 text-white shadow-xl shadow-rose-950/20 text-center">
-              <div className="w-16 h-16 mx-auto rounded-full bg-slate-900/90 border-2 border-white/20 flex items-center justify-center text-2xl font-black text-white mb-3">
-                {(profile?.username || user?.email || 'U').charAt(0).toUpperCase()}
+              <div className="w-16 h-16 mx-auto rounded-full bg-slate-900/90 border-2 border-white/20 flex items-center justify-center text-2xl font-black text-white mb-3 font-mono">
+                {userCode ? userCode.slice(-2) : 'U'}
               </div>
-              <p className="font-bold text-sm truncate">{userDisplayName}</p>
-              <p className="text-xs text-rose-100/80 mb-6 truncate">{user?.email}</p>
+              <p className="font-extrabold text-sm font-mono text-amber-300 tracking-wider mb-0.5">{userCode || 'UID---'}</p>
+              <p className="text-xs text-rose-100/90 mb-6 truncate">{fullName || user?.email}</p>
 
               <div className="bg-slate-900/90 border border-white/10 rounded-xl p-4 flex items-center justify-between text-left">
                 <div>
@@ -320,33 +301,22 @@ export default function AccountPage() {
 
           {/* Cột phải */}
           <div className="lg:col-span-8 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 sm:p-8">
-            {/* TAB 1: THÔNG TIN CÁ NHÂN, USERNAME & CÀI ĐẶT MẬT KHẨU RÚT TIỀN */}
+            {/* TAB 1: THÔNG TIN CÁ NHÂN & CÀI ĐẶT MẬT KHẨU RÚT TIỀN */}
             {activeTab === 'profile' && (
               <div>
                 <h2 className="text-lg font-bold text-white mb-1">Thông tin tài khoản</h2>
-                <p className="text-xs text-slate-400 mb-6">Cập nhật username định danh và thông tin thanh toán nhận tiền hoàn</p>
+                <p className="text-xs text-slate-400 mb-6">Cập nhật thông tin nhận hoàn tiền và thiết lập mã bảo mật</p>
 
                 <form onSubmit={handleSaveProfile} className="space-y-4">
-                  {/* Ô NHẬP USERNAME ĐỊNH DANH */}
-                  <div className="p-4 bg-slate-800/40 border border-slate-700/70 rounded-xl space-y-1.5">
-                    <label className="text-xs font-bold text-slate-200 flex items-center justify-between">
-                      <span>Tên định danh (Username riêng)</span>
-                      <span className="text-[11px] text-rose-400 font-mono">Dùng làm mã định danh đơn</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">@</span>
-                      <input
-                        type="text"
-                        required
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                        placeholder="vd: toan_shopee"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-4 py-2.5 text-xs text-white font-mono outline-none focus:border-rose-500 transition"
-                      />
+                  {/* Ô hiển thị User ID riêng biệt cố định */}
+                  <div className="p-4 bg-slate-800/40 border border-slate-700/70 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-medium">User ID (Mã thành viên cố định)</span>
+                      <p className="text-base font-extrabold font-mono text-amber-400 mt-0.5">{userCode || 'UID---'}</p>
                     </div>
-                    <p className="text-[11px] text-slate-400">
-                      Chỉ dùng chữ cái không dấu (a-z), số (0-9) và dấu gạch dưới (_). Tên này hiển thị trên toàn hệ thống và mã theo dõi đơn hoàn tiền Shopee.
-                    </p>
+                    <span className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">
+                      Định danh duy nhất
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -43,7 +43,7 @@ export default function Home() {
         const fallbackProfile = {
           id: currentUser.id,
           email: currentUser.email,
-          username: `user_${currentUser.id.substring(0, 6)}`,
+          user_code: `UID${currentUser.id.substring(0, 6).toUpperCase()}`,
           balance: 0,
           role: currentUser.email === ADMIN_EMAIL ? 'admin' : 'user'
         };
@@ -136,15 +136,15 @@ export default function Home() {
     setErrorMessage('');
 
     try {
-      // Ưu tiên dùng Username riêng của user làm Sub ID theo dõi đơn
-      const trackingSubId = profile?.username || user?.id || 'guest';
+      // Dùng trực tiếp User ID riêng biệt (user_code dạng UID...) làm Sub ID
+      const trackingUserId = profile?.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`;
 
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           originalUrl: inputUrl.trim(), 
-          userId: trackingSubId 
+          userId: trackingUserId 
         })
       });
       const data = await res.json();
@@ -170,11 +170,8 @@ export default function Home() {
 
   const isUserAdmin = profile?.role === 'admin' || user?.email === ADMIN_EMAIL;
   
-  // Ưu tiên hiển thị @username riêng biệt
-  const displayName = profile?.username 
-    ? `@${profile.username}` 
-    : (user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Thành viên');
-  const avatarChar = (displayName.replace('@', '')[0] || 'U').toUpperCase();
+  // Hiển thị User ID riêng biệt dạng UID...
+  const displayUserId = profile?.user_code || (user?.id ? `UID${user.id.substring(0, 6).toUpperCase()}` : 'UID---');
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#0F172A] text-slate-100 font-sans selection:bg-rose-500 selection:text-white flex flex-col justify-between">
@@ -234,15 +231,13 @@ export default function Home() {
             {/* Trạng thái đăng nhập người dùng */}
             {user ? (
               <div className="flex items-center gap-1 sm:gap-2">
+                {/* Nút hiển thị User ID riêng */}
                 <Link
                   href="/profile"
-                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-1.5 sm:px-2 py-1.5 rounded-lg transition max-w-[80px] sm:max-w-[130px]"
+                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2 py-1.5 rounded-lg transition shrink-0"
                 >
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
-                    {avatarChar}
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-semibold text-slate-200 truncate">
-                    {displayName}
+                  <span className="text-[10px] font-extrabold text-amber-400 font-mono tracking-wide">
+                    {displayUserId}
                   </span>
                 </Link>
 
