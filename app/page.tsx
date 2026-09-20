@@ -166,16 +166,17 @@ export default function Home() {
 
           {/* Menu Điều Hướng & Tài Khoản bên phải */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-            {/* Link điều hướng nhanh */}
+            {/* Trỏ về /profile để xem đơn hàng & lịch sử hoàn tiền */}
             <Link
-              href="/history"
+              href="/profile"
               className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
             >
               Lịch sử
             </Link>
 
+            {/* Trỏ về /profile để xem ví & rút tiền */}
             <Link
-              href="/wallet"
+              href="/profile"
               className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
             >
               Ví tiền
@@ -216,7 +217,7 @@ export default function Home() {
                 </Link>
 
                 <Link
-                  href="/wallet"
+                  href="/profile"
                   className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
                 >
                   <span className="text-slate-400 hidden sm:inline">Số dư:</span>
