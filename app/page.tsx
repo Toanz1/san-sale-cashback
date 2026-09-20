@@ -63,7 +63,6 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Kiểm tra và tự động mở modal nếu chưa chọn ẩn
     const hasSeenGuide = localStorage.getItem('has_seen_cashback_guide');
     if (!hasSeenGuide) {
       setShowGuideModal(true);
@@ -148,64 +147,101 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans">
-      {/* Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/80 border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
+      {/* HEADER DUY NHẤT ĐỒNG BỘ */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F172A]/90 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          
+          {/* Logo bên trái */}
+          <Link href="/" className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center font-black text-xl shadow-lg shadow-rose-500/20 text-white">
               S
             </div>
             <div>
-              <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
                 SĂN SALE <span className="text-rose-500 font-black">HOÀN TIỀN</span>
               </span>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase">Cashback Sàn TMĐT</p>
+              <p className="text-[10px] text-slate-400 font-medium tracking-wider uppercase hidden sm:block">Cashback Sàn TMĐT</p>
             </div>
           </Link>
 
-          <div>
+          {/* Menu Điều Hướng & Tài Khoản bên phải */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+            {/* Link điều hướng nhanh */}
+            <Link
+              href="/history"
+              className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
+            >
+              Lịch sử
+            </Link>
+
+            <Link
+              href="/wallet"
+              className="text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800/80 transition"
+            >
+              Ví tiền
+            </Link>
+
+            {/* Nút thao tác Admin (chỉ hiện khi là admin) */}
+            {isUserAdmin && (
+              <>
+                <Link
+                  href="/admin/orders"
+                  className="text-xs font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
+                >
+                  <span>📊</span> Duyệt Shopee
+                </Link>
+
+                <Link
+                  href="/admin"
+                  className="text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1"
+                >
+                  <span>⚙</span> Quản trị
+                </Link>
+              </>
+            )}
+
+            {/* Trạng thái đăng nhập người dùng */}
             {user ? (
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2">
                 <Link
                   href="/profile"
-                  className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 px-2.5 py-1.5 rounded-lg transition"
+                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2.5 py-1.5 rounded-lg transition"
                 >
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-rose-500 to-pink-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                     {avatarChar}
                   </div>
-                  <span className="text-xs font-semibold text-slate-200 max-w-[120px] truncate">{displayName}</span>
+                  <span className="text-xs font-semibold text-slate-200 max-w-[100px] sm:max-w-[140px] truncate">
+                    {displayName}
+                  </span>
                 </Link>
-
-                {isUserAdmin && (
-                  <Link
-                    href="/admin"
-                    className="text-xs bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-md transition flex items-center gap-1.5"
-                  >
-                    <span>⚙</span> Quản trị
-                  </Link>
-                )}
 
                 <Link
-                  href="/profile"
-                  className="text-xs bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition"
+                  href="/wallet"
+                  className="text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition"
                 >
                   <span className="text-slate-400 hidden sm:inline">Số dư:</span>
-                  <span className="text-emerald-400 font-bold">{Number(profile?.balance || 0).toLocaleString()}đ</span>
+                  <span className="text-emerald-400 font-bold">
+                    {Number(profile?.balance || 0).toLocaleString()}đ
+                  </span>
                 </Link>
 
-                <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1">
+                <button
+                  onClick={handleLogout}
+                  className="text-xs text-slate-400 hover:text-rose-400 transition px-2 py-1.5 font-medium"
+                >
                   Thoát
                 </button>
               </div>
             ) : (
               <Link
                 href="/login"
-                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-4 sm:px-5 py-2 rounded-xl transition shadow-lg text-white"
+                className="text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 px-4 py-2 rounded-xl transition shadow text-white"
               >
                 Đăng nhập
               </Link>
             )}
           </div>
+
         </div>
       </header>
 
@@ -346,7 +382,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* KHỐI HIỂN THỊ TIỀN HOÀN DỰ KIẾN RÕ RÀNG */}
+                      {/* Khối hiển thị tiền hoàn dự kiến */}
                       <div className="mt-2 py-1.5 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                         <span className="text-[10px] text-slate-300 font-medium">Hoàn tiền:</span>
                         <span className="text-[11px] font-black text-emerald-400">
@@ -417,7 +453,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= MODAL HƯỚNG DẪN MUA SẮM (TỰ ĐỘNG BẬT KHI VÀO TRANG) ================= */}
+      {/* Modal Hướng dẫn mua sắm */}
       {showGuideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 sm:p-7 shadow-2xl space-y-5">
@@ -471,7 +507,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Hộp lưu ý chống mất hoa hồng */}
               <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1">
                 <p className="font-bold flex items-center gap-1.5">
                   ⚠️ Lưu ý quan trọng để không bị mất đơn:
