@@ -99,11 +99,12 @@ export default function AdminPage() {
           ...prev,
           title: data.name || prev.title,
           image_url: data.image || prev.image_url,
-          price: data.price ? String(data.price) : prev.price
+          price: data.price ? String(data.price) : prev.price,
+          original_price: data.originalPrice ? String(data.originalPrice) : prev.originalPrice
         }));
         alert('Đã lấy thành công Tên, Ảnh và Giá sản phẩm!');
       } else {
-        alert(data.error || 'Không thể lấy dữ liệu tự động. Hãy thử dán link chi tiết của sản phẩm trên trình duyệt!');
+        alert(data.error || 'Không thể quét dữ liệu. Vui lòng thử lại.');
       }
     } catch (err) {
       alert('Lỗi kết nối tới máy chủ quét dữ liệu!');
