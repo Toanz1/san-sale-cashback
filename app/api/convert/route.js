@@ -44,9 +44,9 @@ export async function POST(req) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } else {
-      // Dùng endpoint adv.php chuẩn của AccessTrade cho chuỗi định danh này
+      // Cấu trúc chuẩn chuyển hướng Deep Link của AccessTrade qua isclix kèm sub_id
       const encodedUrl = encodeURIComponent(cleanUrl);
-      affiliateUrl = `https://click.accesstrade.vn/adv.php?sub4=${cleanSubId}&at_source=deep_link&utm_tool=deeplink&url=${encodedUrl}&at_unique_id=${AT_API_KEY}`;
+      affiliateUrl = `https://go.isclix.com/deep_link/${AT_API_KEY}?url=${encodedUrl}&sub_id=${cleanSubId}`;
     }
 
     // ============================================================
