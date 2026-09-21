@@ -19,7 +19,7 @@ export async function POST(req) {
 
     const cleanUrl = rawUrl.trim();
 
-    // Làm sạch sub_id / sub4
+    // Làm sạch sub_id / sub4 để tracking đơn hàng theo user
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
@@ -44,9 +44,9 @@ export async function POST(req) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } else {
-      // Cấu trúc chuẩn cho chiến dịch TikTok Shop CPS qua isclix kèm định danh và sub_id
+      // Cấu trúc chuẩn chuyển hướng qua domain chính của hệ thống isclix kèm theo sub_id theo dõi
       const encodedUrl = encodeURIComponent(cleanUrl);
-      affiliateUrl = `https://go.isclix.com/click/o/${AT_API_KEY}?url=${encodedUrl}&sub_id=${cleanSubId}`;
+      affiliateUrl = `https://go.isclix.com/deep_link/${AT_API_KEY}?url=${encodedUrl}&sub_id=${cleanSubId}`;
     }
 
     // ============================================================
