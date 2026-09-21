@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
-const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
+const AT_UNIQUE_ID = process.env.ACCESSTRADE_UNIQUE_ID || '0hO~BRrVRzxxHBK2CH4jLfnxat';
 
 export async function POST(req) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req) {
 
     const cleanUrl = rawUrl.trim();
 
-    // Làm sạch sub_id
+    // Làm sạch sub_id / sub4
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
@@ -30,37 +30,23 @@ export async function POST(req) {
       platform = 'Shopee';
     } else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
-    } else if (cleanUrl.includes('tiktok.com')) {
+    } else if (cleanUrl.includes('tiktok.com') || cleanUrl.includes('vt.tiktok.com')) {
       platform = 'TikTok';
     }
 
     let affiliateUrl = '';
 
     // ============================================================
-    // SHOPEE AFFILIATE
+    // XỬ LÝ LINK THEO NỀN TẢNG
     // ============================================================
     if (platform === 'Shopee') {
       const baseProductUrl = cleanUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
-    } 
-    // ============================================================
-   // ============================================================
-    // LAZADA / CÁC SÀN KHÁC DÙNG ACCESSTRADE
-    // ============================================================
-    else {
+    } else {
+      // Các sàn còn lại (TikTok, Lazada, Khác) sử dụng AccessTrade
       const encodedUrl = encodeURIComponent(cleanUrl);
-      // Thay thế bằng mã Domain/Campaign của bạn trên ACCESSTRADE (ví dụ: go.isclix.com)
-      const AT_CAMPAIGN_CODE = process.env.NEXT_PUBLIC_ACCESSTRADE_ID || '467xxxxxxxx'; // Điền mã của bạn vào đây
-      
-      affiliateUrl = `https://go.isclix.com/deep_link/${AT_CAMPAIGN_CODE}?url=${encodedUrl}&traffic_id=${cleanSubId}`;
-    }
-    // ============================================================
-    // TIKTOK SHOP & KHÁC
-    // ============================================================
-    else {
-      const baseProductUrl = cleanUrl.split('?')[0];
-      affiliateUrl = `${baseProductUrl}?sub_id=${cleanSubId}`;
+      affiliateUrl = `https://click.accesstrade.vn/adv.php?sub4=${cleanSubId}&at_source=deep_link&utm_tool=deeplink&url=${encodedUrl}&at_unique_id=${AT_UNIQUE_ID}`;
     }
 
     // ============================================================
