@@ -79,11 +79,11 @@ export async function POST(req) {
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ============================================================
-    // LAZADA AFFILIATE (Trực tiếp qua s.lazada.vn)
+    // ============================================================
+    // LAZADA AFFILIATE (Giữ nguyên toàn bộ link gốc kèm tham số)
     // ============================================================
     else if (platform === 'Lazada') {
-      const baseProductUrl = cleanUrl.split('?')[0];
-      const encodedUrl = encodeURIComponent(baseProductUrl);
+      const encodedUrl = encodeURIComponent(cleanUrl);
       affiliateUrl = `https://s.lazada.vn/s.${LAZADA_AFFILIATE_ID}?sub_id=${cleanSubId}&url=${encodedUrl}`;
     }
     // ============================================================
