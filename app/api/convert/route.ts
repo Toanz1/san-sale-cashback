@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
+const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || '';
 
 // Hàm mở rộng link rút gọn TikTok/Shopee
 async function expandShortUrl(url: string): Promise<string> {
@@ -30,7 +31,7 @@ async function expandShortUrl(url: string): Promise<string> {
   return url;
 }
 
-// Hàm rút gọn link dài thành link ngắn gọn (Thêm kiểu string cho tham số)
+// Hàm rút gọn link dài thành link ngắn gọn
 async function shortenUrl(longUrl: string): Promise<string> {
   try {
     const res = await fetch(`https://is.gd/create.gif?format=simple&url=${encodeURIComponent(longUrl)}`);
@@ -77,9 +78,32 @@ export async function POST(req: Request) {
     } 
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
-      const sourceId = 'Publisher Coupon'; 
-      const encodedTargetUrl = encodeURIComponent(expandedUrl);
-      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
+      
+      try {
+        // Gọi trực tiếp API product_link/create của Accesstrade
+        const atRes = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${ACCESSTRADE_API_KEY}`
+          },
+          body: JSON.stringify({
+            urls: [expandedUrl],
+            utm_source: cleanSubId
+          })
+        });
+
+        const atData = await atRes.json();
+        if (atData && atData.data && (atData.data.short_url || atData.data[0]?.short_url)) {
+          rawAffiliateUrl = atData.data.short_url || atData.data[0].short_url;
+        } else {
+          // Fallback an toàn qua link trạm trung chuyển nếu API phản hồi khác cấu trúc
+          rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
+        }
+      } catch (err) {
+        console.error('Lỗi gọi API Accesstrade:', err);
+        rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
+      }
     }
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
@@ -88,11 +112,10 @@ export async function POST(req: Request) {
     }
     else {
       platform = 'Sàn khác';
-      const sourceId = 'Publisher Coupon';
-      const encodedUrl = encodeURIComponent(expandedUrl);
-      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
     }
 
+    // Tiến hành rút gọn link cuối cùng
     const affiliateUrl = await shortenUrl(rawAffiliateUrl);
 
     if (userId && userId !== 'guest') {
