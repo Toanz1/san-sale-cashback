@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
+const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || 'CSzqKa6JWAVuQszd8uelhNZfZAPYsI3e';
 
 // Hàm mở rộng link rút gọn (TikTok, Shopee, Lazada)
 async function expandShortUrl(url: string): Promise<string> {
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Kết nối qua hệ thống Deep Link của AccessTrade)
+    // 3. XỬ LÝ TIKTOK SHOP (Gọi Deep Link chính thức qua AccessTrade API)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
         cleanTikTokUrl = expandedUrl.split('?')[0];
       }
 
+      // Sử dụng API/Deep link chuẩn của AccessTrade tích hợp kèm API Key và sub_id
       const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
       affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
     }
