@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || 'CSzqKa6JWAVuQszd8uelhNZfZAPYsI3e';
+const TIKTOK_CAMPAIGN_ID = '6648523843406889655'; // Campaign ID TikTok Shop của bạn
 
 // Hàm mở rộng link rút gọn (TikTok, Shopee, Lazada)
 async function expandShortUrl(url: string): Promise<string> {
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Cấu trúc Deep Link chuẩn Accesstrade)
+    // 3. XỬ LÝ TIKTOK SHOP (Gọi API tạo Product Link chính thức của AccessTrade)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
@@ -86,13 +87,35 @@ export async function POST(req: Request) {
         cleanTikTokUrl = expandedUrl.split('?')[0];
       }
 
-      const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
-      
-      // ID Publisher của bạn trên Accesstrade
-      const PUBLISHER_ID = '5578920077038237672'; 
-      
-      // Sử dụng cấu trúc deep_link v6 chính thức của Accesstrade kèm sub4 (để lưu UID thành viên)
-      affiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/0?url=${encodedTargetUrl}&sub4=${cleanSubId}`;
+      // Gọi trực tiếp API Product Link của AccessTrade để tạo link chuẩn không bị lỗi 404
+      try {
+        const atResponse = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${ACCESSTRADE_API_KEY}`
+          },
+          body: JSON.stringify({
+            campaign_id: TIKTOK_CAMPAIGN_ID,
+            urls: [cleanTikTokUrl],
+            utm_source: cleanSubId
+          })
+        });
+
+        const atData = await atResponse.json();
+        // Lấy link rút gọn hoặc link đầy đủ từ kết quả trả về của AccessTrade API
+        if (atData && atData.data && atData.data.length > 0) {
+          affiliateUrl = atData.data[0].aff_short_url || atData.data[0].aff_url;
+        }
+      } catch (apiErr) {
+        console.error('Lỗi gọi API AccessTrade:', apiErr);
+      }
+
+      // Dự phòng nếu API lỗi thì dùng cấu trúc DeepLink chuẩn của isclix
+      if (!affiliateUrl) {
+        const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
+        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
+      }
     }
     // ==========================================
     // 4. CÁC TRƯỜNG HỢP CÒN LẠI
