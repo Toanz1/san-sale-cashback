@@ -73,7 +73,8 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Gọi API tạo link chính thức của AccessTrade)
+    // ==========================================
+    // 3. XỬ LÝ TIKTOK SHOP (Gọi API AccessTrade & Xử lý fallback an toàn)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
@@ -93,16 +94,21 @@ export async function POST(req: Request) {
 
         const atData: any = await atRes.json();
         
-        if (atData && (atData.short_url || atData.data?.short_url || atData.data?.[0]?.short_url)) {
-          affiliateUrl = atData.short_url || atData.data.short_url || atData.data[0].short_url;
+        // Kiểm tra đúng cấu trúc trả về từ AccessTrade API
+        if (atData && atData.success && atData.data) {
+          affiliateUrl = atData.data; // Thường AccessTrade trả về link rút gọn trực tiếp trong `data`
+        } else if (atData && (atData.short_url || atData.data?.short_url)) {
+          affiliateUrl = atData.short_url || atData.data.short_url;
         } else {
-          const encodedUrl = encodeURIComponent(expandedUrl);
-          affiliateUrl = `https://shorten.asia/api/click?url=${encodedUrl}&publisher_id=${ACCESSTRADE_API_TOKEN}&sub_id=${cleanSubId}`;
+          // Fallback an toàn: Giữ nguyên link gốc sản phẩm kèm sub_id thay vì dùng link api chết
+          const separator = expandedUrl.includes('?') ? '&' : '?';
+          affiliateUrl = `${expandedUrl}${separator}sub_id=${cleanSubId}`;
         }
       } catch (err) {
         console.error('Lỗi API AccessTrade:', err);
-        const encodedUrl = encodeURIComponent(expandedUrl);
-        affiliateUrl = `https://shorten.asia/api/click?url=${encodedUrl}&publisher_id=${ACCESSTRADE_API_TOKEN}&sub_id=${cleanSubId}`;
+        // Fallback an toàn khi lỗi mạng
+        const separator = expandedUrl.includes('?') ? '&' : '?';
+        affiliateUrl = `${expandedUrl}${separator}sub_id=${cleanSubId}`;
       }
     }
     // ==========================================
