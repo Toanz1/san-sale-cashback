@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
-// Mã Unique ID AccessTrade của bạn lấy từ link chuyển hướng
-const AT_UNIQUE_ID = process.env.ACCESSTRADE_UNIQUE_ID || '0hO~BRrVRzxxHBK2CH4jLfnxat';
+// Đồng bộ chính xác tên biến ACCESSTRADE_API_KEY từ Vercel của bạn
+const AT_UNIQUE_ID = process.env.ACCESSTRADE_API_KEY || '0hO~BRrVRzxxHBK2CH4jLfnxat';
 
 export async function POST(req) {
   try {
@@ -20,7 +20,7 @@ export async function POST(req) {
 
     const cleanUrl = rawUrl.trim();
 
-    // Làm sạch sub_id
+    // Làm sạch sub_id / sub4
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
@@ -45,9 +45,9 @@ export async function POST(req) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } else {
-      // Các sàn còn lại (TikTok, Lazada, Khác) dùng chuẩn go.isclix.com của AccessTrade
+      // Dùng endpoint chuẩn của AccessTrade kết hợp biến ACCESSTRADE_API_KEY
       const encodedUrl = encodeURIComponent(cleanUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link/${AT_UNIQUE_ID}?url=${encodedUrl}&sub_id=${cleanSubId}`;
+      affiliateUrl = `https://click.accesstrade.vn/adv.php?sub4=${cleanSubId}&at_source=deep_link&utm_tool=deeplink&url=${encodedUrl}&at_unique_id=${AT_UNIQUE_ID}`;
     }
 
     // ============================================================
