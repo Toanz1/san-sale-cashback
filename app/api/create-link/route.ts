@@ -20,7 +20,6 @@ export async function POST(req: Request) {
     } 
     else if (originalUrl.includes('lazada.vn') || originalUrl.includes('lazada.com')) {
       platform = 'Lazada (Trực tiếp)';
-      // Dùng ID trực tiếp không qua trung gian
       const lazadaId = '264211329';
       affiliateUrl = `https://s.lazada.vn/s.${lazadaId}?sub_id=${subId}&url=${encodeURIComponent(originalUrl)}`;
     } 
@@ -29,7 +28,6 @@ export async function POST(req: Request) {
       const apiKey = process.env.ACCESSTRADE_API_KEY;
 
       try {
-        // Gọi API Accesstrade cho TikTok
         const atRes = await fetch('https://api.accesstrade.vn/v1/custom_links', {
           method: 'POST',
           headers: {
@@ -42,14 +40,18 @@ export async function POST(req: Request) {
           })
         });
         const atData = await atRes.json();
-        if (atData && atData.data && atData.data.short_url) {
-          affiliateUrl = atData.data.short_url;
+        
+        if (atData && atData.data && (atData.data.short_url || atData.data.url)) {
+          affiliateUrl = atData.data.short_url || atData.data.url;
         } else {
-          affiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(originalUrl)}&utm_source=${subId}`;
+          // Xử lý sạch link gốc bằng cách cắt bỏ các tham số rác đằng sau dấu ? để chống lỗi 404
+          const cleanUrl = originalUrl.split('?')[0];
+          affiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(cleanUrl)}&utm_source=Publisher%20Coupon&sub_id=${subId}`;
         }
       } catch (err) {
         console.error('Lỗi API Accesstrade TikTok:', err);
-        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(originalUrl)}&utm_source=${subId}`;
+        const cleanUrl = originalUrl.split('?')[0];
+        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(cleanUrl)}&utm_source=Publisher%20Coupon&sub_id=${subId}`;
       }
     }
 
