@@ -74,42 +74,21 @@ export async function POST(req) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP & CÁC SÀN KHÁC (Qua API AccessTrade)
-    // ==========================================
-    else {
-      platform = expandedUrl.includes('tiktok.com') ? 'TikTok Shop' : 'Sàn khác';
+    else if (expandedUrl.includes('tiktok.com')) {
+      platform = 'TikTok Shop';
 
-      try {
-        // Gọi API tạo link sản phẩm chính hãng của AccessTrade
-        const atRes = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `token ${ACCESSTRADE_API_TOKEN}`
-          },
-          body: JSON.stringify({
-            urls: [expandedUrl],
-            utm_source: cleanSubId
-          })
-        });
-
-        const atData = await atRes.json();
-        
-        // Lấy link rút gọn trả về từ AccessTrade API
-        if (atData && atData.data) {
-          affiliateUrl = atData.data.short_url || atData.data[0]?.short_url || '';
-        }
-      } catch (err) {
-        console.error('Lỗi kết nối API AccessTrade:', err);
+      // Trích xuất đúng đoạn URL gốc chứa ID sản phẩm của TikTok, loại bỏ rác thừa
+      let cleanTikTokUrl = expandedUrl;
+      const match = expandedUrl.match(/\/pdp\/(\d+)/);
+      if (match && match[1]) {
+        cleanTikTokUrl = `https://shop.tiktok.com/vn/pdp/${match[1]}`;
       }
 
-      // Fallback dự phòng nếu API AccessTrade bận hoặc lỗi
-      if (!affiliateUrl) {
-        const encodedUrl = encodeURIComponent(expandedUrl);
-        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&sub_id=${cleanSubId}`;
-      }
+      const encodedUrl = encodeURIComponent(cleanTikTokUrl);
+      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&sub_id=${cleanSubId}`;
     }
 
+       
     // Lưu lịch sử vào Supabase
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
