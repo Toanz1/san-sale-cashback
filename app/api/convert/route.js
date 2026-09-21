@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Điền Affiliate ID của bạn hoặc cấu hình trong Vercel Environment Variables
-const SHOPEE_AFFILIATE_ID = '17361810588';
+const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
+const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 
-// Hàm mở link rút gọn chống bị Shopee chặn trên server Vercel
-async function resolveShopeeUrl(shortUrl) {
+// Hàm mở link rút gọn chống bị Shopee/Lazada chặn trên server Vercel
+async function resolveShortUrl(shortUrl) {
   try {
     const res = await fetch(shortUrl, {
       method: 'GET',
-      redirect: 'manual', // Bắt trực tiếp header Location để tránh bị Shopee chặn redirect
+      redirect: 'manual',
       headers: {
         'User-Agent':
           'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -42,13 +42,15 @@ export async function POST(req) {
 
     let cleanUrl = rawUrl.trim();
 
-    // 1. Nhận diện và mở link nếu là link rút gọn của Shopee / TikTok
+    // 1. Nhận diện và mở link rút gọn của các sàn
     if (
       cleanUrl.includes('shp.ee') ||
       cleanUrl.includes('s.shopee.vn') ||
-      cleanUrl.includes('shope.ee')
+      cleanUrl.includes('shope.ee') ||
+      cleanUrl.includes('s.lazada.vn') ||
+      cleanUrl.includes('lazada.vn/s.')
     ) {
-      cleanUrl = await resolveShopeeUrl(cleanUrl);
+      cleanUrl = await resolveShortUrl(cleanUrl);
     }
 
     // Làm sạch sub_id (chỉ cho phép ký tự an toàn)
@@ -69,24 +71,29 @@ export async function POST(req) {
     let affiliateUrl = '';
 
     // ============================================================
-    // GHÉP LINK SHOPEE TRỰC TIẾP QUA AFFILIATE ID
+    // SHOPEE AFFILIATE
     // ============================================================
     if (platform === 'Shopee') {
-      // Cắt bỏ các tham số rác sau dấu ?
       const baseProductUrl = cleanUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
-
-      // Cổng redirect tiếp thị liên kết chuẩn của Shopee
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ============================================================
-    // LAZADA / TIKTOK
+    // LAZADA AFFILIATE (Trực tiếp qua s.lazada.vn)
+    // ============================================================
+    else if (platform === 'Lazada') {
+      const baseProductUrl = cleanUrl.split('?')[0];
+      const encodedUrl = encodeURIComponent(baseProductUrl);
+      affiliateUrl = `https://s.lazada.vn/s.${LAZADA_AFFILIATE_ID}?sub_id=${cleanSubId}&url=${encodedUrl}`;
+    }
+    // ============================================================
+    // TIKTOK SHOP HOẶC CÁC SÀN KHÁC
     // ============================================================
     else {
       const baseProductUrl = cleanUrl.split('?')[0];
       const encodedUrl = encodeURIComponent(baseProductUrl);
-      const MO_PARTNER_CODE = process.env.NEXT_PUBLIC_MASOFFER_ID || 'masoffer_id';
-      affiliateUrl = `https://go.masoffer.net/v0/${MO_PARTNER_CODE}/?go=${encodedUrl}&traffic_id=${cleanSubId}`;
+      // Nếu có Accesstrade hoặc giữ nguyên link gốc kèm sub_id
+      affiliateUrl = `${baseProductUrl}?sub_id=${cleanSubId}`;
     }
 
     // ============================================================
