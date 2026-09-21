@@ -4,15 +4,15 @@ import { createClient } from '@supabase/supabase-js';
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 
-// Hàm mở rộng link rút gọn siêu tốc (giải mã vt.tiktok.com thành link gốc)
-async function expandShortUrl(url) {
+// Hàm mở rộng link rút gọn TikTok/Shopee
+async function expandShortUrl(url: string): Promise<string> {
   try {
     if (url.includes('vt.tiktok.com') || url.includes('tiktok.com/t/') || url.includes('shp.ee') || url.includes('s.shopee.vn')) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // Giới hạn tối đa 3 giây để không bị chậm
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
 
       const response = await fetch(url, {
-        method: 'GET', // Dùng GET thay vì HEAD để tránh bị TikTok chặn bot
+        method: 'GET',
         redirect: 'follow',
         signal: controller.signal,
         headers: {
@@ -24,19 +24,35 @@ async function expandShortUrl(url) {
         return response.url;
       }
     }
-  } catch (e) {
-    console.error('Lỗi giải mã link rút gọn, sử dụng link gốc:', e.message);
+  } catch (e: any) {
+    console.error('Lỗi giải mã link rút gọn:', e.message);
   }
   return url;
 }
 
-export async function POST(req) {
+// Hàm rút gọn link dài thành link ngắn gọn (Thêm kiểu string cho tham số)
+async function shortenUrl(longUrl: string): Promise<string> {
+  try {
+    const res = await fetch(`https://is.gd/create.gif?format=simple&url=${encodeURIComponent(longUrl)}`);
+    if (res.ok) {
+      const short = await res.text();
+      if (short && short.startsWith('http')) {
+        return short.trim();
+      }
+    }
+  } catch (e) {
+    console.error('Lỗi rút gọn link, giữ nguyên link dài:', e);
+  }
+  return longUrl;
+}
+
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const rawUrl = body.originalUrl || body.url || '';
     const userId = body.userId || 'guest';
 
-    if (!rawUrl || !rawUrl.trim().startsWith('http')) {
+    if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.trim().startsWith('http')) {
       return NextResponse.json(
         { error: 'Vui lòng nhập đường link hợp lệ (bắt đầu bằng http:// hoặc https://)' },
         { status: 400 }
@@ -44,7 +60,6 @@ export async function POST(req) {
     }
 
     const cleanUrl = rawUrl.trim();
-    // Giải mã link rút gọn thành link chi tiết sản phẩm đầy đủ
     const expandedUrl = await expandShortUrl(cleanUrl);
 
     const cleanSubId = String(userId)
@@ -52,32 +67,33 @@ export async function POST(req) {
       .slice(0, 50) || 'guest';
 
     let platform = 'Khác';
-    let affiliateUrl = '';
+    let rawAffiliateUrl = '';
 
     if (expandedUrl.includes('shopee.vn') || expandedUrl.includes('shp.ee') || expandedUrl.includes('shope.ee')) {
       platform = 'Shopee';
       const baseProductUrl = expandedUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
-      affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
       const sourceId = 'Publisher Coupon'; 
-      // Khi đã giải mã ra link chuẩn của TikTok, đưa vào Isclix sẽ không bao giờ bị 404 nữa
       const encodedTargetUrl = encodeURIComponent(expandedUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
       const baseUrl = expandedUrl.split('?')[0];
-      affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     }
     else {
       platform = 'Sàn khác';
       const sourceId = 'Publisher Coupon';
       const encodedUrl = encodeURIComponent(expandedUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
+
+    const affiliateUrl = await shortenUrl(rawAffiliateUrl);
 
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -109,7 +125,7 @@ export async function POST(req) {
           : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30'
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Lỗi xử lý Convert:', err);
     return NextResponse.json(
       { error: 'Hệ thống chuyển đổi link tạm thời bận, vui lòng thử lại!' },
