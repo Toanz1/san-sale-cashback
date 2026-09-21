@@ -30,7 +30,7 @@ async function expandShortUrl(url: string): Promise<string> {
   return url;
 }
 
-// Hàm rút gọn link dài thành link ngắn gọn
+// Hàm rút gọn link dài thành link ngắn gọn chuyên nghiệp
 async function shortenUrl(longUrl: string): Promise<string> {
   try {
     const res = await fetch(`https://is.gd/create.gif?format=simple&url=${encodeURIComponent(longUrl)}`);
@@ -76,17 +76,15 @@ export async function POST(req: Request) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-    // 2. TIKTOK SHOP: Sử dụng cấu trúc deep_link chuẩn với tham số url=
+    // 2. TIKTOK SHOP: Sử dụng cấu trúc deep_link chuẩn v6 của AccessTrade
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
       
       const PUBLISHER_ID = '5578920077038237672';
       const CAMPAIGN_ID = '6648523843406889655';
       
-      // Dùng encodeURIComponent chuẩn cho tham số url
       const encodedUrl = encodeURIComponent(expandedUrl);
       
-      // Lắp đúng cấu trúc dùng tham số url= và sub4 cho sub_id
       rawAffiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/${CAMPAIGN_ID}?sub4=${cleanSubId}&url=${encodedUrl}`;
     }
     // 3. LAZADA: Dùng ID tiếp thị của Lazada
@@ -101,10 +99,10 @@ export async function POST(req: Request) {
       rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&sub_id=${cleanSubId}`;
     }
 
-    // Tiến hành rút gọn link cuối cùng
+    // Tự động rút gọn link Affiliate thành link ngắn gọn (giống các web lớn)
     const affiliateUrl = await shortenUrl(rawAffiliateUrl);
 
-    // Lưu lịch sử vào Supabase
+    // Lưu lịch sử vào Supabase (nếu có cấu hình và người dùng đăng nhập)
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey =
