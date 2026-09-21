@@ -76,17 +76,17 @@ export async function POST(req: Request) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-    // 2. TIKTOK SHOP (Sử dụng chuẩn url_enc kèm Base64 giống AccessTrade)
+    // 2. TIKTOK SHOP: Sử dụng cấu trúc chuẩn internal_cl.php của AccessTrade
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
-      const PUBLISHER_ID = '5578920077038237672';
-      const CAMPAIGN_ID = '6648523843406889655';
+      
+      const AT_UNIQUE_ID = 'Hr7Yr706Eg_omX6qX6bz8Pnxat';
       
       // Mã hóa link sản phẩm sang Base64 để thu gọn đường link
       const encodedBase64Url = Buffer.from(expandedUrl).toString('base64');
       
-      // Sử dụng đúng biến rawAffiliateUrl và tham số url_enc chuẩn v6
-      rawAffiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/${CAMPAIGN_ID}?sub4=${cleanSubId}&url_enc=${encodedBase64Url}`;
+      // Lắp ráp đúng chuẩn link internal của AccessTrade không sợ lỗi 404
+      rawAffiliateUrl = `https://click.accesstrade.vn/internal_cl.php?sub4=${cleanSubId}&at_source=deep_link&utm_tool=deeplink&at_unique_id=${AT_UNIQUE_ID}&url_enc=${encodedBase64Url}`;
     }
     // 3. LAZADA: Dùng ID tiếp thị của Lazada
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
