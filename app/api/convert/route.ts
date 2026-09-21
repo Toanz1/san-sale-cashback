@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Gọi Deep Link chính thức qua AccessTrade API)
+    // 3. XỬ LÝ TIKTOK SHOP (Cấu trúc Deep Link chuẩn Accesstrade)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
@@ -86,9 +86,13 @@ export async function POST(req: Request) {
         cleanTikTokUrl = expandedUrl.split('?')[0];
       }
 
-      // Sử dụng API/Deep link chuẩn của AccessTrade tích hợp kèm API Key và sub_id
       const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
+      
+      // ID Publisher của bạn trên Accesstrade
+      const PUBLISHER_ID = '5578920077038237672'; 
+      
+      // Sử dụng cấu trúc deep_link v6 chính thức của Accesstrade kèm sub4 (để lưu UID thành viên)
+      affiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/0?url=${encodedTargetUrl}&sub4=${cleanSubId}`;
     }
     // ==========================================
     // 4. CÁC TRƯỜNG HỢP CÒN LẠI
