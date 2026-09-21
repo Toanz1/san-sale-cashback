@@ -5,6 +5,24 @@ import { createClient } from '@supabase/supabase-js';
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 
+// Hàm hỗ trợ mở rộng link rút gọn (như vt.tiktok.com, shp.ee) để lấy link gốc
+async function expandShortUrl(url: string): Promise<string> {
+  try {
+    if (url.includes('vt.tiktok.com') || url.includes('shp.ee') || url.includes('s.shopee.vn')) {
+      const response = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'follow',
+      });
+      if (response.url) {
+        return response.url;
+      }
+    }
+  } catch (e) {
+    console.error('Không thể mở rộng link rút gọn, giữ nguyên link gốc:', e);
+  }
+  return url;
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -20,6 +38,9 @@ export async function POST(req) {
 
     const cleanUrl = rawUrl.trim();
 
+    // Mở rộng link rút gọn nếu là link ngắn của TikTok/Shopee để tránh lỗi 404
+    const expandedUrl = await expandShortUrl(cleanUrl);
+
     // Làm sạch sub_id để tracking đơn hàng theo User ID của thành viên
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -31,33 +52,33 @@ export async function POST(req) {
     // ============================================================
     // 1. SHOPEE: Sử dụng link gốc + Shopee Affiliate ID + Sub ID
     // ============================================================
-    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee') || cleanUrl.includes('shope.ee')) {
+    if (expandedUrl.includes('shopee.vn') || expandedUrl.includes('shp.ee') || expandedUrl.includes('shope.ee')) {
       platform = 'Shopee';
-      const baseProductUrl = cleanUrl.split('?')[0];
+      const baseProductUrl = expandedUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ============================================================
-    // 2. TIKTOK SHOP: Sử dụng hệ thống DeepLink của Accesstrade (Publisher Coupon)
+    // 2. TIKTOK SHOP: Sử dụng DeepLink của Accesstrade kèm link đã mở rộng
     // ============================================================
-    else if (cleanUrl.includes('tiktok.com')) {
+    else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
       const sourceId = 'Publisher Coupon'; 
-      const encodedTargetUrl = encodeURIComponent(cleanUrl);
+      const encodedTargetUrl = encodeURIComponent(expandedUrl);
       affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
     // ============================================================
     // 3. LAZADA: Sử dụng link sản phẩm Lazada chuẩn kèm ID tiếp thị
     // ============================================================
-    else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
+    else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
-      const baseUrl = cleanUrl.split('?')[0];
+      const baseUrl = expandedUrl.split('?')[0];
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     }
     else {
       platform = 'Sàn khác';
       const sourceId = 'Publisher Coupon';
-      const encodedUrl = encodeURIComponent(cleanUrl);
+      const encodedUrl = encodeURIComponent(expandedUrl);
       affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
 
@@ -81,7 +102,20 @@ export async function POST(req) {
       }
     }
 
-    return NextResponse.json({ affiliateUrl, platform });
+    return NextResponse.json({ 
+      affiliateUrl, 
+      platform,
+      // Trả về kèm tên sàn để giao diện hiển thị linh hoạt hơn
+      productInfo: {
+        title: `Sản phẩm chính hãng từ ${platform}`,
+        shop: `Gian hàng ${platform} uy tín`,
+        image: platform === 'TikTok Shop' 
+          ? 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a' 
+          : platform === 'Shopee' 
+          ? 'https://images.unsplash.com/photo-1472851294608-062f824d29cc'
+          : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30'
+      }
+    });
   } catch (err) {
     console.error('Lỗi xử lý Convert:', err);
     return NextResponse.json(
