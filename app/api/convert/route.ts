@@ -4,6 +4,32 @@ import { createClient } from '@supabase/supabase-js';
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 
+// Hàm mở rộng link rút gọn siêu tốc (giải mã vt.tiktok.com thành link gốc)
+async function expandShortUrl(url) {
+  try {
+    if (url.includes('vt.tiktok.com') || url.includes('tiktok.com/t/') || url.includes('shp.ee') || url.includes('s.shopee.vn')) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // Giới hạn tối đa 3 giây để không bị chậm
+
+      const response = await fetch(url, {
+        method: 'GET', // Dùng GET thay vì HEAD để tránh bị TikTok chặn bot
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      clearTimeout(timeoutId);
+      if (response.url && !response.url.includes('404') && !response.url.includes('error')) {
+        return response.url;
+      }
+    }
+  } catch (e) {
+    console.error('Lỗi giải mã link rút gọn, sử dụng link gốc:', e.message);
+  }
+  return url;
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -18,6 +44,8 @@ export async function POST(req) {
     }
 
     const cleanUrl = rawUrl.trim();
+    // Giải mã link rút gọn thành link chi tiết sản phẩm đầy đủ
+    const expandedUrl = await expandShortUrl(cleanUrl);
 
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -26,29 +54,28 @@ export async function POST(req) {
     let platform = 'Khác';
     let affiliateUrl = '';
 
-    // Xử lý trực tiếp không qua fetch ngầm giúp tốc độ load tức thì
-    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee') || cleanUrl.includes('shope.ee')) {
+    if (expandedUrl.includes('shopee.vn') || expandedUrl.includes('shp.ee') || expandedUrl.includes('shope.ee')) {
       platform = 'Shopee';
-      const baseProductUrl = cleanUrl.split('?')[0];
+      const baseProductUrl = expandedUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-    else if (cleanUrl.includes('tiktok.com') || cleanUrl.includes('vt.tiktok.com')) {
+    else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
       const sourceId = 'Publisher Coupon'; 
-      const encodedTargetUrl = encodeURIComponent(cleanUrl);
-      // Accesstrade tự động xử lý link rút gọn vt.tiktok.com
+      // Khi đã giải mã ra link chuẩn của TikTok, đưa vào Isclix sẽ không bao giờ bị 404 nữa
+      const encodedTargetUrl = encodeURIComponent(expandedUrl);
       affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
-    else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
+    else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
-      const baseUrl = cleanUrl.split('?')[0];
+      const baseUrl = expandedUrl.split('?')[0];
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     }
     else {
       platform = 'Sàn khác';
       const sourceId = 'Publisher Coupon';
-      const encodedUrl = encodeURIComponent(cleanUrl);
+      const encodedUrl = encodeURIComponent(expandedUrl);
       affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
 
