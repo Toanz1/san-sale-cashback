@@ -112,10 +112,11 @@ export async function POST(req: Request) {
       }
 
       // SỬA LẠI ĐOẠN DỰ PHÒNG NÀY (Đảm bảo không bị lỗi 404)
+      // SỬA LẠI ĐOẠN DỰ PHÒNG NÀY ĐỂ KHÔNG BỊ LỖI 404
       if (!affiliateUrl) {
-        // Dùng đường dẫn rút gọn chiến dịch chính thức thay vì deep_link lỗi
         const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
-        affiliateUrl = `https://pub.accesstrade.vn/deep_link/${TIKTOK_CAMPAIGN_ID}?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
+        // Sử dụng đúng domain go.isclix.com và tham số sub_id chuẩn của hệ thống trung gian
+        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=Publisher%20Coupon&sub_id=${cleanSubId}`;
       }
     }
     // ==========================================
