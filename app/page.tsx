@@ -16,7 +16,8 @@ export default function Home() {
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [hotProducts, setHotProducts] = useState<any[]>([]);
-
+  const [productInfo, setProductInfo] = useState<any>(null); // Lưu thông tin sản phẩm quét được
+  
   // State quản lý Modal Hướng dẫn tự động bật
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -140,6 +141,7 @@ export default function Home() {
     }
   };
 
+  // HÀM XỬ LÝ CHUYỂN ĐỔI LINK VÀ QUÉT THÔNG TIN SẢN PHẨM HOÀN CHỈNH
   const handleConvert = async () => {
     if (!user) {
       alert('Vui lòng đăng nhập tài khoản để nhận tiền hoàn!');
@@ -154,11 +156,13 @@ export default function Home() {
 
     setLoading(true);
     setAffiliateLink('');
+    setProductInfo(null);
     setErrorMessage('');
 
     try {
       const trackingUserId = profile?.user_code || `UID${user.id.substring(0, 6).toUpperCase()}`;
 
+      // 1. Gọi API tạo link Affiliate
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,15 +172,45 @@ export default function Home() {
         })
       });
       const data = await res.json();
-      if (data.affiliateUrl) {
+
+      if (res.ok && data.affiliateUrl) {
         setAffiliateLink(data.affiliateUrl);
+
+        // 2. Gọi API quét thông tin sản phẩm (có cơ chế dự phòng an toàn)
+        try {
+          const scrapeRes = await fetch('/api/scrape-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: inputUrl.trim() })
+          });
+          const scrapeData = await scrapeRes.json();
+
+          setProductInfo({
+            title: scrapeData?.name || `Sản phẩm ưu đãi từ ${data.platform || 'Sàn TMĐT'}`,
+            price: scrapeData?.price ? Number(scrapeData.price).toLocaleString() + 'đ' : 'Đang cập nhật',
+            shop: scrapeData?.shop || 'Cửa hàng chính hãng',
+            image: scrapeData?.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30',
+            cashback: 'Nhận hoàn tiền tự động'
+          });
+        } catch {
+          setProductInfo({
+            title: `Sản phẩm ưu đãi từ ${data.platform || 'Sàn TMĐT'}`,
+            price: 'Đang cập nhật',
+            shop: 'Cửa hàng đối tác',
+            image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30',
+            cashback: 'Nhận hoàn tiền tự động'
+          });
+        }
+
       } else {
         setErrorMessage(data.error || 'Không thể tạo link hoàn tiền!');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       setErrorMessage('Đã xảy ra lỗi kết nối khi tạo link!');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleCopyCode = (voucher: any) => {
@@ -212,7 +246,6 @@ export default function Home() {
 
           {/* Menu Điều Hướng & Tài Khoản */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Nút Giới Thiệu Bạn Bè */}
             <Link
               href="/referral"
               className="text-[11px] sm:text-xs bg-gradient-to-r from-amber-500/20 to-rose-500/20 hover:from-amber-500/30 hover:to-rose-500/30 border border-amber-500/40 text-amber-300 font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition shrink-0 shadow-sm"
@@ -222,7 +255,6 @@ export default function Home() {
               <span className="hidden xs:inline sm:inline">Mời bạn</span>
             </Link>
 
-            {/* Nút thao tác Admin */}
             {isUserAdmin && (
               <div className="flex items-center gap-1">
                 <Link
@@ -244,7 +276,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Trạng thái đăng nhập */}
             {user ? (
               <div className="flex items-center gap-1 sm:gap-2">
                 <Link
@@ -346,20 +377,65 @@ export default function Home() {
               </div>
             )}
 
+            {/* HIỂN THỊ KẾT QUẢ DẠNG THẺ SẢN PHẨM TRỰC QUAN */}
             {affiliateLink && (
-              <div className="mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
-                <div>
-                  <p className="text-xs font-bold text-emerald-400 uppercase tracking-wide">✓ Tạo link hoàn tiền thành công!</p>
-                  <p className="text-xs text-slate-300 mt-0.5">Bấm nút để đi đến ứng dụng mua hàng và ghi nhận hoa hồng.</p>
+              <div className="mt-4 bg-white border-2 border-rose-200 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row gap-4 items-center transition-all animate-fadeIn text-slate-900 text-left">
+                
+                {/* Ảnh sản phẩm minh họa */}
+                <div className="w-full md:w-36 h-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 relative shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={productInfo?.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30"} 
+                    alt="Product" 
+                    className="w-full h-full object-cover" 
+                  />
+                  <span className="absolute top-1 left-1 bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
+                    Chính hãng
+                  </span>
                 </div>
-                <a
-                  href={affiliateLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto text-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase px-5 py-2.5 rounded-lg shadow transition shrink-0"
-                >
-                  Đi Tới Mua Hàng ➔
-                </a>
+
+                {/* Thông tin chi tiết sản phẩm */}
+                <div className="flex-1 w-full space-y-2">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm line-clamp-2">
+                      {productInfo?.title || "Sản phẩm được tối ưu hóa hoàn tiền"}
+                    </h4>
+                    
+                    <div className="mt-2 flex flex-wrap gap-2 items-center">
+                      <span className="bg-slate-900 text-white text-[11px] font-bold px-2 py-1 rounded-md">
+                        🏷️ Giá: {productInfo?.price || "Đang cập nhật"}
+                      </span>
+                      <span className="bg-slate-200 text-slate-700 text-[11px] font-medium px-2 py-1 rounded-md">
+                        🏪 {productInfo?.shop || "Cửa hàng đối tác"}
+                      </span>
+                      <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-md">
+                        💰 {productInfo?.cashback || "Hoàn tiền tự động"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Các nút hành động */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <a
+                      href={affiliateLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition"
+                    >
+                      🛒 Đi Tới Mua Hàng →
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(affiliateLink);
+                        alert('Đã sao chép link hoàn tiền vào bộ nhớ tạm!');
+                      }}
+                      className="flex items-center justify-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition"
+                    >
+                      📋 Sao Chép Link
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -433,7 +509,6 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* Khối tiền hoàn thực tế */}
                       <div className="mt-2 py-1 px-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                         <span className="text-[10px] text-slate-300">Hoàn tiền:</span>
                         <span className="text-[11px] font-black text-emerald-400">
