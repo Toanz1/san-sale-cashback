@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
-const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || '';
 
 // Hàm mở rộng link rút gọn TikTok/Shopee
 async function expandShortUrl(url: string): Promise<string> {
@@ -70,54 +69,35 @@ export async function POST(req: Request) {
     let platform = 'Khác';
     let rawAffiliateUrl = '';
 
+    // 1. SHOPEE: Dùng link chuyển hướng chính chủ của Shopee
     if (expandedUrl.includes('shopee.vn') || expandedUrl.includes('shp.ee') || expandedUrl.includes('shope.ee')) {
       platform = 'Shopee';
       const baseProductUrl = expandedUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
+    // 2. TIKTOK SHOP: Đi qua định dạng DeepLink chuẩn của AccessTrade (Isclix)
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
-      
-      try {
-        // Gọi trực tiếp API product_link/create của Accesstrade
-        const atRes = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `token ${ACCESSTRADE_API_KEY}`
-          },
-          body: JSON.stringify({
-            urls: [expandedUrl],
-            utm_source: cleanSubId
-          })
-        });
-
-        const atData = await atRes.json();
-        if (atData && atData.data && (atData.data.short_url || atData.data[0]?.short_url)) {
-          rawAffiliateUrl = atData.data.short_url || atData.data[0].short_url;
-        } else {
-          // Fallback an toàn qua link trạm trung chuyển nếu API phản hồi khác cấu trúc
-          rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
-        }
-      } catch (err) {
-        console.error('Lỗi gọi API Accesstrade:', err);
-        rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
-      }
+      const encodedTargetUrl = encodeURIComponent(expandedUrl);
+      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&sub_id=${cleanSubId}`;
     }
+    // 3. LAZADA: Dùng ID tiếp thị của Lazada
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
       const baseUrl = expandedUrl.split('?')[0];
       rawAffiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     }
+    // 4. CÁC SÀN KHÁC
     else {
       platform = 'Sàn khác';
-      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher+Coupon&sub_id=${cleanSubId}`;
+      rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&sub_id=${cleanSubId}`;
     }
 
     // Tiến hành rút gọn link cuối cùng
     const affiliateUrl = await shortenUrl(rawAffiliateUrl);
 
+    // Lưu lịch sử vào Supabase
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey =
