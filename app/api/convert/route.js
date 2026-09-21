@@ -1,23 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Các Affiliate ID chính chủ của bạn
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
-const AT_API_KEY = process.env.ACCESSTRADE_API_KEY || '0hO~BRrVRzxxHBK2CH4jLfnxat';
-
-// Hàm hỗ trợ mở rộng link rút gọn (nếu cần)
-async function resolveShortUrl(url) {
-  if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com') || url.includes('shp.ee')) {
-    try {
-      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-      if (response.url) {
-        return response.url;
-      }
-    } catch (e) {
-      console.error('Không thể mở rộng link rút gọn:', e);
-    }
-  }
-  return url;
-}
+const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || 'YOUR_LAZADA_ID';
+const TIKTOK_AFFILIATE_ID = process.env.TIKTOK_AFFILIATE_ID || 'YOUR_TIKTOK_ID';
 
 export async function POST(req) {
   try {
@@ -32,37 +19,46 @@ export async function POST(req) {
       );
     }
 
-    // Tự động giải mã link rút gọn từ app
-    let cleanUrl = await resolveShortUrl(rawUrl.trim());
+    const cleanUrl = rawUrl.trim();
 
-    // Làm sạch sub_id / sub4
+    // Làm sạch sub_id để tracking đơn hàng theo User ID của thành viên
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
 
-    // Nhận diện nền tảng từ URL đã giải mã
     let platform = 'Khác';
-    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee') || cleanUrl.includes('shope.ee')) {
-      platform = 'Shopee';
-    } else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
-      platform = 'Lazada';
-    } else if (cleanUrl.includes('tiktok.com')) {
-      platform = 'TikTok';
-    }
-
     let affiliateUrl = '';
 
     // ============================================================
-    // XỬ LÝ LINK THEO NỀN TẢNG
+    // 1. SHOPEE: Sử dụng link gốc + Shopee Affiliate ID + Sub ID
     // ============================================================
-    if (platform === 'Shopee') {
+    if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee') || cleanUrl.includes('shope.ee')) {
+      platform = 'Shopee';
       const baseProductUrl = cleanUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
-    } else {
-      // Cấu trúc chuẩn cho TikTok / Lazada qua isclix kèm link gốc đã mở rộng
-      const encodedUrl = encodeURIComponent(cleanUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link/${AT_API_KEY}?url=${encodedUrl}&sub_id=${cleanSubId}`;
+    } 
+    // ============================================================
+    // 2. TIKTOK SHOP: Sử dụng link sản phẩm sạch kèm ID tiếp thị & sub_id
+    // ============================================================
+    else if (cleanUrl.includes('tiktok.com') || cleanUrl.includes('shop.tiktok.com') || cleanUrl.includes('vt.tiktok.com')) {
+      platform = 'TikTok';
+      const baseUrl = cleanUrl.split('?')[0];
+      // Gắn affiliate ID và tracking user vào query params của TikTok
+      affiliateUrl = `${baseUrl}?aff_id=${TIKTOK_AFFILIATE_ID}&sub_id=${cleanSubId}`;
+    } 
+    // ============================================================
+    // 3. LAZADA: Sử dụng link sản phẩm Lazada chuẩn kèm ID tiếp thị
+    // ============================================================
+    else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
+      platform = 'Lazada';
+      const baseUrl = cleanUrl.split('?')[0];
+      affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
+    } 
+    else {
+      platform = 'Sàn khác';
+      const baseUrl = cleanUrl.split('?')[0];
+      affiliateUrl = `${baseUrl}?sub_id=${cleanSubId}`;
     }
 
     // ============================================================
