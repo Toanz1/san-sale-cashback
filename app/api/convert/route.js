@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Các Affiliate ID chính chủ của bạn
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
-const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || 'YOUR_LAZADA_ID';
-const TIKTOK_AFFILIATE_ID = process.env.TIKTOK_AFFILIATE_ID || 'YOUR_TIKTOK_ID';
+const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 
 export async function POST(req) {
   try {
@@ -39,14 +38,14 @@ export async function POST(req) {
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ============================================================
-    // 2. TIKTOK SHOP: Sử dụng link sản phẩm sạch kèm ID tiếp thị & sub_id
+    // 2. TIKTOK SHOP: Sử dụng hệ thống DeepLink của Accesstrade (Publisher Coupon)
     // ============================================================
-    else if (cleanUrl.includes('tiktok.com') || cleanUrl.includes('shop.tiktok.com') || cleanUrl.includes('vt.tiktok.com')) {
-      platform = 'TikTok';
-      const baseUrl = cleanUrl.split('?')[0];
-      // Gắn affiliate ID và tracking user vào query params của TikTok
-      affiliateUrl = `${baseUrl}?aff_id=${TIKTOK_AFFILIATE_ID}&sub_id=${cleanSubId}`;
-    } 
+    else if (cleanUrl.includes('tiktok.com')) {
+      platform = 'TikTok Shop';
+      const sourceId = 'Publisher Coupon'; 
+      const encodedTargetUrl = encodeURIComponent(cleanUrl);
+      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
+    }
     // ============================================================
     // 3. LAZADA: Sử dụng link sản phẩm Lazada chuẩn kèm ID tiếp thị
     // ============================================================
@@ -54,11 +53,12 @@ export async function POST(req) {
       platform = 'Lazada';
       const baseUrl = cleanUrl.split('?')[0];
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
-    } 
+    }
     else {
       platform = 'Sàn khác';
-      const baseUrl = cleanUrl.split('?')[0];
-      affiliateUrl = `${baseUrl}?sub_id=${cleanSubId}`;
+      const sourceId = 'Publisher Coupon';
+      const encodedUrl = encodeURIComponent(cleanUrl);
+      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&utm_source=${sourceId}&sub_id=${cleanSubId}`;
     }
 
     // ============================================================
