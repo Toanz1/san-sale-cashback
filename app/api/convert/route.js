@@ -45,12 +45,15 @@ export async function POST(req) {
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ============================================================
-    // LAZADA AFFILIATE (Truyền thẳng link gốc/rút gọn vào tham số url)
+   // ============================================================
+    // LAZADA / CÁC SÀN KHÁC DÙNG ACCESSTRADE
     // ============================================================
-    else if (platform === 'Lazada') {
+    else {
       const encodedUrl = encodeURIComponent(cleanUrl);
-      // Sử dụng cấu trúc tiếp thị trực tiếp chuẩn của Lazada Publisher
-      affiliateUrl = `https://s.lazada.vn/s.${LAZADA_AFFILIATE_ID}?sub_id=${cleanSubId}&url=${encodedUrl}`;
+      // Thay thế bằng mã Domain/Campaign của bạn trên ACCESSTRADE (ví dụ: go.isclix.com)
+      const AT_CAMPAIGN_CODE = process.env.NEXT_PUBLIC_ACCESSTRADE_ID || '467xxxxxxxx'; // Điền mã của bạn vào đây
+      
+      affiliateUrl = `https://go.isclix.com/deep_link/${AT_CAMPAIGN_CODE}?url=${encodedUrl}&traffic_id=${cleanSubId}`;
     }
     // ============================================================
     // TIKTOK SHOP & KHÁC
