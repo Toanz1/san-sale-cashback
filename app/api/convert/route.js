@@ -4,6 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 const SHOPEE_AFFILIATE_ID = process.env.SHOPEE_AFFILIATE_ID || '17361810588';
 const AT_API_KEY = process.env.ACCESSTRADE_API_KEY || '0hO~BRrVRzxxHBK2CH4jLfnxat';
 
+// Hàm hỗ trợ mở rộng link rút gọn (nếu cần)
+async function resolveShortUrl(url) {
+  if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com') || url.includes('shp.ee')) {
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      if (response.url) {
+        return response.url;
+      }
+    } catch (e) {
+      console.error('Không thể mở rộng link rút gọn:', e);
+    }
+  }
+  return url;
+}
+
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -17,20 +32,21 @@ export async function POST(req) {
       );
     }
 
-    const cleanUrl = rawUrl.trim();
+    // Tự động giải mã link rút gọn từ app
+    let cleanUrl = await resolveShortUrl(rawUrl.trim());
 
     // Làm sạch sub_id / sub4
     const cleanSubId = String(userId)
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 50) || 'guest';
 
-    // Nhận diện nền tảng
+    // Nhận diện nền tảng từ URL đã giải mã
     let platform = 'Khác';
     if (cleanUrl.includes('shopee.vn') || cleanUrl.includes('shp.ee') || cleanUrl.includes('shope.ee')) {
       platform = 'Shopee';
     } else if (cleanUrl.includes('lazada.vn') || cleanUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
-    } else if (cleanUrl.includes('tiktok.com') || cleanUrl.includes('vt.tiktok.com')) {
+    } else if (cleanUrl.includes('tiktok.com')) {
       platform = 'TikTok';
     }
 
@@ -44,9 +60,9 @@ export async function POST(req) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       affiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } else {
-      // Sử dụng cấu trúc click tracking chuẩn của isclix để tránh lỗi 404 deep_link
+      // Cấu trúc chuẩn cho TikTok / Lazada qua isclix kèm link gốc đã mở rộng
       const encodedUrl = encodeURIComponent(cleanUrl);
-      affiliateUrl = `https://go.isclix.com/click?a=1&pub_id=${AT_API_KEY}&url=${encodedUrl}&sub_id=${cleanSubId}`;
+      affiliateUrl = `https://go.isclix.com/deep_link/${AT_API_KEY}?url=${encodedUrl}&sub_id=${cleanSubId}`;
     }
 
     // ============================================================
