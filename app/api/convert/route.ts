@@ -6,7 +6,7 @@ const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || 'CSzqKa6JWAVuQszd8uelhNZfZAPYsI3e';
 const TIKTOK_CAMPAIGN_ID = '6648523843406889655'; // Campaign ID TikTok Shop của bạn
 
-// Hàm mở rộng link rút gọn (TikTok, Shopee, Lazada)
+// Hàm mở rộng link rút gọn
 async function expandShortUrl(url: string): Promise<string> {
   try {
     if (url.includes('vt.tiktok.com') || url.includes('tiktok.com/t/') || url.includes('shp.ee') || url.includes('s.shopee.vn') || url.includes('s.lazada.vn')) {
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Gọi API tạo Product Link chính thức của AccessTrade)
+    // 3. XỬ LÝ TIKTOK SHOP (Gọi API Product Link chính thức)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
         cleanTikTokUrl = expandedUrl.split('?')[0];
       }
 
-      // Gọi trực tiếp API Product Link của AccessTrade để tạo link chuẩn không bị lỗi 404
+      // Gọi API Product Link của AccessTrade để lấy link chuẩn
       try {
         const atResponse = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
           method: 'POST',
@@ -103,7 +103,6 @@ export async function POST(req: Request) {
         });
 
         const atData = await atResponse.json();
-        // Lấy link rút gọn hoặc link đầy đủ từ kết quả trả về của AccessTrade API
         if (atData && atData.data && atData.data.length > 0) {
           affiliateUrl = atData.data[0].aff_short_url || atData.data[0].aff_url;
         }
@@ -111,10 +110,9 @@ export async function POST(req: Request) {
         console.error('Lỗi gọi API AccessTrade:', apiErr);
       }
 
-      // Dự phòng nếu API lỗi thì dùng cấu trúc DeepLink chuẩn của isclix
+      // Dự phòng nếu gọi API thất bại, tạo link theo định dạng chuẩn của AccessTrade Publisher
       if (!affiliateUrl) {
-        const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
-        affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
+        affiliateUrl = `https://pub.accesstrade.vn/deep_link/${TIKTOK_CAMPAIGN_ID}?url=${encodeURIComponent(cleanTikTokUrl)}&utm_source=${cleanSubId}`;
       }
     }
     // ==========================================
@@ -122,8 +120,7 @@ export async function POST(req: Request) {
     // ==========================================
     else {
       platform = 'Website khác';
-      const encodedTargetUrl = encodeURIComponent(expandedUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
+      affiliateUrl = `https://pub.accesstrade.vn/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=${cleanSubId}`;
     }
        
     // Lưu lịch sử vào Supabase
