@@ -76,17 +76,18 @@ export async function POST(req: Request) {
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-   // 2. TIKTOK SHOP: Sử dụng đúng cấu trúc Deeplink chuẩn của AccessTrade
+    // 2. TIKTOK SHOP: Sử dụng cấu trúc deep_link chuẩn với tham số url=
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
       
       const PUBLISHER_ID = '5578920077038237672';
       const CAMPAIGN_ID = '6648523843406889655';
       
-      // Dùng encodeURIComponent chuẩn để tránh lỗi ký tự đặc biệt trên Serverless
+      // Dùng encodeURIComponent chuẩn cho tham số url
       const encodedUrl = encodeURIComponent(expandedUrl);
       
-      rawAffiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/${CAMPAIGN_ID}?sub4=${cleanSubId}&url_enc=${encodedUrl}`;
+      // Lắp đúng cấu trúc dùng tham số url= và sub4 cho sub_id
+      rawAffiliateUrl = `https://go.isclix.com/deep_link/v6/${PUBLISHER_ID}/${CAMPAIGN_ID}?sub4=${cleanSubId}&url=${encodedUrl}`;
     }
     // 3. LAZADA: Dùng ID tiếp thị của Lazada
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
