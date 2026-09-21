@@ -74,6 +74,7 @@ export async function POST(req: Request) {
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
     // ==========================================
+    // ==========================================
     // 3. XỬ LÝ TIKTOK SHOP (Gọi API Product Link chính thức)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
@@ -110,9 +111,11 @@ export async function POST(req: Request) {
         console.error('Lỗi gọi API AccessTrade:', apiErr);
       }
 
-      // Dự phòng nếu gọi API thất bại, tạo link theo định dạng chuẩn của AccessTrade Publisher
+      // SỬA LẠI ĐOẠN DỰ PHÒNG NÀY (Đảm bảo không bị lỗi 404)
       if (!affiliateUrl) {
-        affiliateUrl = `https://pub.accesstrade.vn/deep_link/${TIKTOK_CAMPAIGN_ID}?url=${encodeURIComponent(cleanTikTokUrl)}&utm_source=${cleanSubId}`;
+        // Dùng đường dẫn rút gọn chiến dịch chính thức thay vì deep_link lỗi
+        const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
+        affiliateUrl = `https://pub.accesstrade.vn/deep_link/${TIKTOK_CAMPAIGN_ID}?url=${encodedTargetUrl}&utm_source=${cleanSubId}`;
       }
     }
     // ==========================================
