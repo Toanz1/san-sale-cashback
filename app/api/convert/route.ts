@@ -6,7 +6,7 @@ const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 const ACCESSTRADE_API_TOKEN = process.env.ACCESSTRADE_API_KEY || 'CSzqKa6JWAVuQszd8uelhNZfZAPYsI3e';
 
 // Hàm mở rộng link rút gọn (TikTok, Shopee, Lazada)
-async function expandShortUrl(url) {
+async function expandShortUrl(url: string): Promise<string> {
   try {
     if (url.includes('vt.tiktok.com') || url.includes('tiktok.com/t/') || url.includes('shp.ee') || url.includes('s.shopee.vn') || url.includes('s.lazada.vn')) {
       const controller = new AbortController();
@@ -25,13 +25,13 @@ async function expandShortUrl(url) {
         return response.url;
       }
     }
-  } catch (e) {
+  } catch (e: any) {
     console.error('Lỗi giải mã link rút gọn:', e.message);
   }
   return url;
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
     const rawUrl = body.originalUrl || body.url || '';
@@ -70,24 +70,49 @@ export async function POST(req) {
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
       const baseUrl = expandedUrl.split('?')[0];
-      // Gắn trực tiếp mã affiliate Lazada đi kèm sub_id
       affiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
+    // ==========================================
+    // 3. XỬ LÝ TIKTOK SHOP (Gọi API tạo link chính thức của AccessTrade)
     // ==========================================
     else if (expandedUrl.includes('tiktok.com')) {
       platform = 'TikTok Shop';
 
-      // Trích xuất đúng đoạn URL gốc chứa ID sản phẩm của TikTok, loại bỏ rác thừa
-      let cleanTikTokUrl = expandedUrl;
-      const match = expandedUrl.match(/\/pdp\/(\d+)/);
-      if (match && match[1]) {
-        cleanTikTokUrl = `https://shop.tiktok.com/vn/pdp/${match[1]}`;
+      try {
+        const atRes = await fetch('https://api.accesstrade.vn/v1/product_link/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${ACCESSTRADE_API_TOKEN}`
+          },
+          body: JSON.stringify({
+            url: expandedUrl,
+            utm_source: cleanSubId
+          })
+        });
+
+        const atData: any = await atRes.json();
+        
+        if (atData && (atData.short_url || atData.data?.short_url || atData.data?.[0]?.short_url)) {
+          affiliateUrl = atData.short_url || atData.data.short_url || atData.data[0].short_url;
+        } else {
+          const encodedUrl = encodeURIComponent(expandedUrl);
+          affiliateUrl = `https://shorten.asia/api/click?url=${encodedUrl}&publisher_id=${ACCESSTRADE_API_TOKEN}&sub_id=${cleanSubId}`;
+        }
+      } catch (err) {
+        console.error('Lỗi API AccessTrade:', err);
+        const encodedUrl = encodeURIComponent(expandedUrl);
+        affiliateUrl = `https://shorten.asia/api/click?url=${encodedUrl}&publisher_id=${ACCESSTRADE_API_TOKEN}&sub_id=${cleanSubId}`;
       }
-
-      const encodedUrl = encodeURIComponent(cleanTikTokUrl);
-      affiliateUrl = `https://go.isclix.com/deep_link?url=${encodedUrl}&sub_id=${cleanSubId}`;
     }
-
+    // ==========================================
+    // 4. XỬ LÝ CÁC TRƯỜNG HỢP CÒN LẠI (DỰ PHÒNG)
+    // ==========================================
+    else {
+      platform = 'Website khác';
+      const encodedUrl = encodeURIComponent(expandedUrl);
+      affiliateUrl = `https://shorten.asia/api/click?url=${encodedUrl}&publisher_id=${ACCESSTRADE_API_TOKEN}&sub_id=${cleanSubId}`;
+    }
        
     // Lưu lịch sử vào Supabase
     if (userId && userId !== 'guest') {
@@ -114,7 +139,7 @@ export async function POST(req) {
         image: 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a'
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Lỗi xử lý Convert:', err);
     return NextResponse.json(
       { error: 'Hệ thống chuyển đổi link tạm thời bận, vui lòng thử lại!' },
