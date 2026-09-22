@@ -6,7 +6,7 @@ const LAZADA_AFFILIATE_ID = process.env.LAZADA_AFFILIATE_ID || '264211329';
 const ACCESSTRADE_API_KEY = process.env.ACCESSTRADE_API_KEY || 'CSzqKa6JWAVuQszd8uelhNZfZAPYsI3e';
 const TIKTOK_CAMPAIGN_ID = '6648523843406889655';
 
-// Hàm mở rộng link rút gọn
+// Hàm giải mã link rút gọn chuẩn xác
 async function expandShortUrl(url: string): Promise<string> {
   try {
     if (url.includes('vt.tiktok.com') || url.includes('tiktok.com/t/') || url.includes('shp.ee') || url.includes('s.shopee.vn') || url.includes('s.lazada.vn')) {
@@ -32,7 +32,7 @@ async function expandShortUrl(url: string): Promise<string> {
   return url;
 }
 
-// Hàm phụ trợ tự động biến link dài thành link ngắn gọn chuyên nghiệp
+// Hàm rút gọn link dự phòng qua is.gd
 async function shortenUrl(longUrl: string): Promise<string> {
   try {
     const res = await fetch(`https://is.gd/create.gif?format=simple&url=${encodeURIComponent(longUrl)}`);
@@ -71,27 +71,18 @@ export async function POST(req: Request) {
     let platform = 'Khác';
     let rawAffiliateUrl = '';
 
-    // ==========================================
-    // 1. XỬ LÝ SHOPEE
-    // ==========================================
     if (expandedUrl.includes('shopee.vn') || expandedUrl.includes('shp.ee') || expandedUrl.includes('shope.ee')) {
       platform = 'Shopee';
       const baseProductUrl = expandedUrl.split('?')[0];
       const encodedOrigin = encodeURIComponent(baseProductUrl);
       rawAffiliateUrl = `https://s.shopee.vn/an_redir?origin_link=${encodedOrigin}&affiliate_id=${SHOPEE_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-    // ==========================================
-    // 2. XỬ LÝ LAZADA
-    // ==========================================
     else if (expandedUrl.includes('lazada.vn') || expandedUrl.includes('s.lazada.vn')) {
       platform = 'Lazada';
       const baseUrl = expandedUrl.split('?')[0];
       rawAffiliateUrl = `${baseUrl}?laz_aff_id=${LAZADA_AFFILIATE_ID}&sub_id=${cleanSubId}`;
     } 
-    // ==========================================
-    // 3. XỬ LÝ TIKTOK SHOP (Gọi API AccessTrade)
-    // ==========================================
-    else if (expandedUrl.includes('tiktok.com')) {
+    else if (expandedUrl.includes('tiktok.com') || expandedUrl.includes('vt.tiktok.com') || expandedUrl.includes('shop.tiktok')) {
       platform = 'TikTok Shop';
       
       let cleanTikTokUrl = expandedUrl;
@@ -118,7 +109,6 @@ export async function POST(req: Request) {
 
         const atData = await atResponse.json();
         
-        // Bắt mọi trường hợp trả về link rút gọn hoặc link chuẩn từ Accesstrade
         if (atData && atData.data) {
           if (Array.isArray(atData.data) && atData.data.length > 0) {
             rawAffiliateUrl = atData.data[0].short_url || atData.data[0].aff_short_url || atData.data[0].url || atData.data[0].aff_url;
@@ -130,24 +120,18 @@ export async function POST(req: Request) {
         console.error('Lỗi gọi API AccessTrade:', apiErr);
       }
 
-      // Dự phòng an toàn nếu API không trả về
       if (!rawAffiliateUrl) {
-        const encodedTargetUrl = encodeURIComponent(cleanTikTokUrl);
-        rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodedTargetUrl}&utm_source=Publisher%20Coupon&sub_id=${cleanSubId}`;
+        const cleanUrlOnly = cleanTikTokUrl.split('?')[0];
+        rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(cleanUrlOnly)}&utm_source=Publisher%20Coupon&sub_id=${cleanSubId}`;
       }
-    }
-    // ==========================================
-    // 4. CÁC TRƯỜNG HỢP CÒN LẠI
-    // ==========================================
-    else {
+    } else {
       platform = 'Website khác';
       rawAffiliateUrl = `https://go.isclix.com/deep_link?url=${encodeURIComponent(expandedUrl)}&utm_source=Publisher%20Coupon&sub_id=${cleanSubId}`;
     }
 
-    // Tự động rút gọn mọi link Affiliate trả về để đảm bảo luôn ngắn gọn, đẹp mắt
+    // Ép buộc rút gọn qua is.gd để chắc chắn trả về link ngắn
     const affiliateUrl = await shortenUrl(rawAffiliateUrl);
         
-    // Lưu lịch sử vào Supabase
     if (userId && userId !== 'guest') {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
